@@ -1,0 +1,1052 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Pulsa</title>
+<style>
+  :root {
+    --bg: #15171c; --bg2: #1d2027; --plate: #23262e;
+    --cap: #2e323b; --cap-top: #3a3f4a; --cap-edge: #1a1d23; --ink: #e8eaef; --ink2: #8e95a3;
+    --mod: #262a32; --mod-top: #31353f;
+    --accent: #ff7a45; --accent-top: #ff9666; --accent-ink: #1b0f08;
+    --glow: 255, 122, 69;
+    --pad: #1f2229; --pad-edge: #2c3039;
+    --font: "Inter", "Roboto", system-ui, sans-serif;
+  }
+  [data-theme="crema"] {
+    --bg: #d9d2c3; --bg2: #e4ddd0; --plate: #c9c0ae;
+    --cap: #efe9dc; --cap-top: #f8f4ea; --cap-edge: #b5ab96; --ink: #3a3328; --ink2: #8a7f6c;
+    --mod: #a59d8c; --mod-top: #b8b09e;
+    --accent: #c4523a; --accent-top: #d6664d; --accent-ink: #fff6ee;
+    --glow: 196, 82, 58;
+    --pad: #e4ddd0; --pad-edge: #bdb3a0;
+  }
+  [data-theme="menta"] {
+    --bg: #10201e; --bg2: #152926; --plate: #1a3330;
+    --cap: #dff3ec; --cap-top: #f0fbf7; --cap-edge: #93b8ad; --ink: #17332e; --ink2: #5d8a80;
+    --mod: #2f5a52; --mod-top: #3a6b62;
+    --accent: #6ee7c5; --accent-top: #8ff0d4; --accent-ink: #0b2a23;
+    --glow: 110, 231, 197;
+    --pad: #152926; --pad-edge: #24443f;
+  }
+  [data-theme="noche"] {
+    --bg: #07070b; --bg2: #0e0e15; --plate: #101018;
+    --cap: #15151f; --cap-top: #1c1c29; --cap-edge: #050508; --ink: #c9ccff; --ink2: #6b6f9e;
+    --mod: #12121b; --mod-top: #181824;
+    --accent: #7c5cff; --accent-top: #9478ff; --accent-ink: #fff;
+    --glow: 124, 92, 255;
+    --pad: #0e0e15; --pad-edge: #1d1d2b;
+  }
+  [data-theme="noche"] .key { box-shadow: 0 0 0 1px rgba(var(--glow), .18) inset; }
+  [data-theme="noche"] .key .lbl { text-shadow: 0 0 6px rgba(var(--glow), .9); }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+    font-family: var(--font); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+    touch-action: none; overscroll-behavior: none; transition: background .4s; }
+
+  /* ── Barra de arriba ─────────────────────────────────────────── */
+  #bar { position: fixed; top: 0; left: 0; right: 0; height: 34px; display: flex; align-items: center;
+    gap: 14px; padding: 0 14px; font-size: 13px; color: var(--ink2); z-index: 5; }
+  #bar .brand { font-weight: 700; color: var(--ink); letter-spacing: .02em; }
+  #conn { display: flex; align-items: center; gap: 7px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #e5534b; transition: background .3s, box-shadow .3s; }
+  .dot.ok { background: #3fb950; box-shadow: 0 0 8px #3fb95088; }
+  .led { display: flex; align-items: center; gap: 6px; opacity: .55; transition: opacity .2s; }
+  .led i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink2); transition: background .2s, box-shadow .2s; }
+  .led.on { opacity: 1; color: var(--ink); }
+  .led.on i { background: var(--accent); box-shadow: 0 0 8px rgba(var(--glow), .9); }
+  #bar .grow { flex: 1; }
+  #gear { width: 34px; height: 30px; border: 0; background: none; color: var(--ink2); font-size: 19px;
+    border-radius: 8px; display: grid; place-items: center; }
+  #gear:active { background: var(--bg2); }
+
+  /* ── Teclado ─────────────────────────────────────────────────── */
+  #stage { position: fixed; inset: 34px 0 0 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 14px; padding: 6px 12px 12px; }
+  /* Abajo: el teclado toca el borde de la tablet y la mano descansa en la mesa. */
+  #stage.pos-abajo { justify-content: flex-end; padding-bottom: 0; }
+  #stage.pos-abajo #pad { order: -1; }
+  #stage.pos-abajo #board, #stage.pos-lado #board, #stage.pos-lado #pad { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  #stage.pos-lado { flex-direction: row; align-items: flex-end; padding-bottom: 0; }
+  #board { position: relative; background: var(--plate); border-radius: 14px;
+    box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 18px 40px rgba(0,0,0,.35); transition: background .4s; }
+  .key { position: absolute; border-radius: 9px; background: var(--cap-edge); }
+  .key .cap { position: absolute; inset: 0 0 4px 0; border-radius: 8px;
+    background: linear-gradient(180deg, var(--cap-top), var(--cap));
+    box-shadow: 0 1px 0 rgba(255,255,255,.08) inset, 0 -2px 0 rgba(0,0,0,.12) inset;
+    transition: transform 90ms cubic-bezier(.3,.7,.4,1), inset 90ms, filter 120ms; will-change: transform; }
+  .key.mod .cap { background: linear-gradient(180deg, var(--mod-top), var(--mod)); }
+  .key.accent .cap { background: linear-gradient(180deg, var(--accent-top), var(--accent)); }
+  .key.accent .lbl { color: var(--accent-ink); }
+  .key .lbl { position: absolute; inset: 0 0 4px 0; display: flex; flex-direction: column;
+    align-items: flex-start; justify-content: flex-start; padding: 7px 9px; font-size: var(--fs, 15px);
+    line-height: 1.05; color: var(--ink); font-weight: 500; transition: transform 90ms cubic-bezier(.3,.7,.4,1); pointer-events: none; }
+  .key.center .lbl { align-items: center; justify-content: center; padding: 0; }
+  .key.small .lbl { font-size: calc(var(--fs, 15px) * .72); color: var(--ink2); }
+  .key.mod .lbl { font-size: calc(var(--fs, 15px) * .78); }
+  .key.accent .lbl { color: var(--accent-ink); }
+  .key .lbl .sh { font-size: .78em; color: var(--ink2); margin-bottom: 3px; }
+  .key .lbl .alt { position: absolute; right: 8px; bottom: 7px; font-size: .7em; color: var(--ink2); }
+  .key .lbl .fnl { position: absolute; right: 7px; top: 6px; font-size: .62em; color: var(--accent); font-weight: 600; opacity: .9; }
+  .fn-on .key .lbl .fnl { opacity: 1; }
+  .fn-on .key.hasfn .cap { box-shadow: 0 0 0 2px rgba(var(--glow), .55) inset; }
+  .key .glow { position: absolute; inset: -2px; border-radius: 10px; pointer-events: none; opacity: 0;
+    box-shadow: 0 0 18px 2px rgba(var(--glow), .75); transition: opacity .55s ease-out; }
+  .key.down .cap, .key.down .lbl { transform: translateY(3px); }
+  .key.down .cap { inset: 0 0 1px 0; filter: brightness(.9); }
+  .key.down .glow { opacity: 1; transition: opacity 30ms; }
+  .key.lit .cap::after { content: ""; position: absolute; right: 9px; top: 9px; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(var(--glow), 1); }
+  .key.latched .cap { box-shadow: 0 0 0 2px var(--accent) inset; }
+  .key.iso { clip-path: var(--iso); }
+  .key.iso .cap, .key.iso .glow { clip-path: var(--iso); }
+  #board.rgb .key .glow { box-shadow: 0 0 20px 3px hsla(var(--h, 20), 95%, 60%, .8); }
+
+  /* ── Trackpad ────────────────────────────────────────────────── */
+  #pad { position: relative; border-radius: 16px; background: var(--pad); border: 1px solid var(--pad-edge);
+    box-shadow: 0 2px 0 rgba(255,255,255,.03) inset, 0 12px 30px rgba(0,0,0,.25); overflow: hidden;
+    display: flex; flex-direction: column; transition: background .4s; }
+  #pad[hidden] { display: none; }
+  #pad .surface { flex: 1; position: relative; }
+  #pad .surface::before { content: ""; position: absolute; inset: 0;
+    background: radial-gradient(circle at var(--px, 50%) var(--py, 50%), rgba(var(--glow), .14), transparent 40%);
+    opacity: 0; transition: opacity .3s; }
+  #pad.touching .surface::before { opacity: 1; transition: opacity .05s; }
+  #pad .btns { display: flex; height: 44px; border-top: 1px solid var(--pad-edge); }
+  #pad .btns div { flex: 1; transition: background .1s; }
+  #pad .btns div + div { border-left: 1px solid var(--pad-edge); }
+  #pad .btns div.down { background: rgba(var(--glow), .16); }
+  #pad .hint { position: absolute; left: 0; right: 0; bottom: 10px; padding: 0 12px; text-align: center; font-size: 12px; color: var(--ink2); opacity: .55; pointer-events: none; }
+
+  /* ── Ajustes ─────────────────────────────────────────────────── */
+  #sheet { position: fixed; inset: 0; z-index: 10; display: flex; justify-content: flex-end; pointer-events: none; }
+  #sheet .shade { position: absolute; inset: 0; background: rgba(0,0,0,.35); opacity: 0; transition: opacity .25s; }
+  #sheet .panel { position: relative; width: min(380px, 92vw); height: 100%; overflow-y: auto; padding: 20px 20px 30px;
+    background: color-mix(in srgb, var(--bg2) 88%, transparent); backdrop-filter: blur(22px) saturate(1.3);
+    -webkit-backdrop-filter: blur(22px) saturate(1.3); border-left: 1px solid rgba(255,255,255,.07);
+    transform: translateX(105%); transition: transform .32s cubic-bezier(.2,.8,.2,1); touch-action: pan-y; }
+  #sheet.open { pointer-events: auto; }
+  #sheet.open .shade { opacity: 1; }
+  #sheet.open .panel { transform: none; }
+  .panel h2 { margin: 0 0 18px; font-size: 18px; }
+  .panel h3 { margin: 20px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink2); font-weight: 600; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button { flex: 1 1 auto; min-width: 70px; padding: 10px 10px; border-radius: 10px; border: 1px solid var(--pad-edge);
+    background: var(--bg); color: var(--ink); font: 500 13px var(--font); transition: background .15s, border-color .15s; }
+  .seg button small { display: block; font-size: 11px; color: var(--ink2); font-weight: 400; margin-top: 2px; }
+  .seg .lab { flex-basis: 100%; font-size: 11px; color: var(--ink2); margin: 6px 0 0; }
+  .seg button.on { border-color: var(--accent); background: rgba(var(--glow), .14); }
+  .slider { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--ink2); }
+  .slider input { flex: 1; accent-color: var(--accent); }
+  .row { display: flex; align-items: center; justify-content: space-between; font-size: 14px; padding: 6px 0; }
+  .sw { width: 46px; height: 28px; border-radius: 14px; background: var(--pad-edge); position: relative; transition: background .2s; border: 0; }
+  .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .sw.on { background: var(--accent); }
+  .sw.on::after { transform: translateX(18px); }
+  .panel p { font-size: 12px; color: var(--ink2); line-height: 1.5; }
+  .panel .leave { margin-top: 24px; width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--pad-edge);
+    background: none; color: var(--ink); font: 500 14px var(--font); }
+
+  #toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px); padding: 9px 16px; border-radius: 20px;
+    background: var(--bg2); color: var(--ink); font-size: 13px; opacity: 0; transition: opacity .25s, transform .25s; z-index: 20; pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span class="brand">Pulsa</span>
+  <span id="conn"><span class="dot" id="dot"></span><span id="pcname">Conectando…</span></span>
+  <span class="grow"></span>
+  <span class="led" id="led-caps"><i></i>Mayús</span>
+  <span class="led" id="led-num"><i></i>Num</span>
+  <span class="led" id="led-fn" hidden><i></i>Fn</span>
+  <button id="gear" aria-label="Ajustes">⚙</button>
+</div>
+
+<div id="stage">
+  <div id="board"></div>
+  <div id="pad" hidden>
+    <div class="surface"><div class="hint">Un dedo mueve · toque = clic · dos dedos = desplazar o clic derecho</div></div>
+    <div class="btns"><div data-b="0"></div><div data-b="2"></div></div>
+  </div>
+</div>
+
+<div id="sheet">
+  <div class="shade"></div>
+  <div class="panel">
+    <h2>Ajustes</h2>
+    <h3>Teclado</h3>
+    <div class="seg" id="opt-layout">
+      <button data-v="full">Completo<small>100 %</small></button>
+      <button data-v="sixty">Compacto<small>60 % + trackpad</small></button>
+    </div>
+    <h3>Posición</h3>
+    <div class="seg" id="opt-pos"></div>
+    <div class="slider" style="margin-top:12px"><span>Alto de las teclas</span><input id="opt-tall" type="range" min="100" max="150"></div>
+    <div class="row"><span>Ignorar la palma</span><button class="sw" id="opt-palm"></button></div>
+    <p>Con «Ignorar la palma», un toque tan grande como una mano apoyada no pulsa nada, y si un dedo se aplasta hasta parecer una palma, la tecla se suelta.</p>
+    <h3>Interruptor</h3>
+    <div class="seg" id="opt-switch">
+      <button data-v="blue">Azul<small>clic nítido</small></button>
+      <button data-v="brown">Marrón<small>táctil</small></button>
+      <button data-v="red">Rojo<small>lineal</small></button>
+      <button data-v="thock">Crema<small>grave, «thock»</small></button>
+      <button data-v="laptop">Portátil<small>teclas planas</small></button>
+      <button data-v="office">Oficina<small>membrana</small></button>
+      <button data-v="typewriter">Máquina<small>de escribir</small></button>
+      <div class="lab">De juego y ciencia ficción</div>
+      <button data-v="neon">Neón<small>pitido futurista</small></button>
+      <button data-v="laser">Láser<small>disparo corto</small></button>
+      <button data-v="retro">Retro<small>8 bits</small></button>
+      <button data-v="bubble">Burbuja<small>«blup»</small></button>
+      <button data-v="crystal">Cristal<small>notas musicales</small></button>
+      <button data-v="wood">Madera<small>bloque hueco</small></button>
+      <button data-v="off">Silencio</button>
+    </div>
+    <div class="slider" style="margin-top:12px"><span>Volumen</span><input id="opt-vol" type="range" min="0" max="100"></div>
+    <div class="row"><span>Vibración</span><button class="sw" id="opt-haptic"></button></div>
+    <div class="row"><span>Sonido también al soltar</span><button class="sw" id="opt-up"></button></div>
+    <h3>Aspecto</h3>
+    <div class="seg" id="opt-theme">
+      <button data-v="grafito">Grafito</button>
+      <button data-v="crema">Crema</button>
+      <button data-v="menta">Menta</button>
+      <button data-v="noche">Noche</button>
+    </div>
+    <div class="row"><span>Brillo arcoíris al pulsar</span><button class="sw" id="opt-rgb"></button></div>
+    <h3>Letras impresas</h3>
+    <div class="seg" id="opt-print">
+      <button data-v="es">Español</button>
+      <button data-v="us">Inglés (EE. UU.)</button>
+    </div>
+    <p>Solo cambia lo que se ve en las teclas. Lo que se escribe lo decide la distribución del PC, así que la ñ y las tildes salen igual que con tu teclado de siempre.</p>
+    <div id="pad-opts">
+      <h3>Trackpad</h3>
+      <div class="slider"><span>Velocidad</span><input id="opt-speed" type="range" min="5" max="40"></div>
+      <div class="row"><span>Desplazamiento natural</span><button class="sw" id="opt-natural"></button></div>
+    </div>
+    <h3>Tecla Fn (compacto)</h3>
+    <p>Mantén Fn: los números dan F1–F12, I J K L son flechas, U/O Inicio/Fin, Y/H RePág/AvPág, Retroceso es Supr y P Impr Pant. Dos toques seguidos en Fn la dejan fija.</p>
+    <button class="leave" id="leave">Desconectar</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+// ═══════════════════════════════════════════════════════════════════
+//  Ajustes guardados en la tablet
+// ═══════════════════════════════════════════════════════════════════
+const DEFAULTS = { layout: "full", pos: "abajo", tall: 130, palm: true, sw: "brown", vol: 70, haptic: true, up: true, theme: "grafito", rgb: false,
+  print: "es", speed: 16, natural: true };
+const cfg = Object.assign({}, DEFAULTS);
+try { Object.assign(cfg, JSON.parse(localStorage.getItem("pulsa") || "{}")); } catch (_) {}
+function save() { try { localStorage.setItem("pulsa", JSON.stringify(cfg)); } catch (_) {} }
+const native = window.PulsaNative || null;
+
+// ═══════════════════════════════════════════════════════════════════
+//  Conexión con el PC
+// ═══════════════════════════════════════════════════════════════════
+let ws = null, online = false, retry = 400;
+function connect() {
+  const name = native && native.deviceName ? native.deviceName() : "tablet";
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws?name=" + encodeURIComponent(name));
+  ws.onopen = () => { online = true; retry = 400; setConn(); };
+  ws.onmessage = (e) => {
+    let m; try { m = JSON.parse(e.data); } catch (_) { return; }
+    if (m.t === "hello") { pcName = m.name; setConn(); }
+    else if (m.t === "leds") { leds.caps = m.caps; leds.num = m.num; showLeds(); }
+  };
+  ws.onclose = () => {
+    online = false; setConn(); releaseAll(false);
+    setTimeout(connect, retry); retry = Math.min(retry * 1.6, 4000);
+  };
+  ws.onerror = () => { try { ws.close(); } catch (_) {} };
+}
+let pcName = "";
+function setConn() {
+  document.getElementById("dot").classList.toggle("ok", online);
+  document.getElementById("pcname").textContent = online ? (pcName || "Conectado") : "Sin conexión · reintentando";
+}
+function send(o) { if (online) ws.send(JSON.stringify(o)); }
+setInterval(() => send({ t: "p" }), 1000);
+
+const leds = { caps: false, num: false };
+function showLeds() {
+  document.getElementById("led-caps").classList.toggle("on", leds.caps);
+  document.getElementById("led-num").classList.toggle("on", leds.num);
+  for (const el of keyEls) {
+    const c = +el.dataset.c;
+    el.classList.toggle("lit", (c === 58 && leds.caps) || (c === 69 && leds.num));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Sonido: interruptores mecánicos sintetizados (sin archivos)
+// ═══════════════════════════════════════════════════════════════════
+//  Cada pulsación son varias capas cortas: el golpe del vástago contra el
+//  fondo (ruido filtrado), la resonancia de la tecla y la placa (senos que
+//  se apagan rápido) y, en los "azules", el chasquido de la pieza de clic.
+//  Se generan unas cuantas variantes al elegir el interruptor y se elige una
+//  al azar en cada pulsación, con un poco de tono distinto, para que no
+//  suene a la misma grabación repetida.
+let actx = null, master = null;
+const banks = {};
+function audio() {
+  if (!actx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    actx = new AC({ latencyHint: "interactive" });
+    master = actx.createGain();
+    master.connect(actx.destination);
+    setVolume();
+  }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+function setVolume() { if (master) master.gain.value = Math.pow(cfg.vol / 100, 1.6) * 1.1; }
+
+// Perfiles: frecuencias en Hz, tiempos en segundos.
+const PROFILES = {
+  blue:  { click: 1, clickF: 5200, clickQ: 4, hit: 3200, hitQ: 1.2, hitDecay: .012, body: 680, bodyDecay: .02, bodyGain: .35, up: .55, upF: 4200, pre: .006 },
+  brown: { click: 0, hit: 2400, hitQ: 1, hitDecay: .014, body: 520, bodyDecay: .026, bodyGain: .45, up: .35, upF: 3000, bump: .25 },
+  red:   { click: 0, hit: 2000, hitQ: .9, hitDecay: .013, body: 460, bodyDecay: .024, bodyGain: .4, up: .3, upF: 2600 },
+  // Teclados normales, sin interruptor mecánico.
+  // Portátil (teclas planas «chiclet»): golpe corto y agudo, casi sin cuerpo.
+  laptop: { click: 0, hit: 3600, hitQ: 1.6, hitDecay: .006, body: 950, bodyDecay: .008, bodyGain: .15, up: .25, upF: 4600 },
+  // Oficina (membrana de goma): golpe sordo y, al soltar, la tecla traquetea.
+  office: { click: 0, hit: 1500, hitQ: .7, hitDecay: .011, body: 340, bodyDecay: .016, bodyGain: .3, up: .5, upF: 2300, bump: .4 },
+  thock: { click: 0, hit: 1100, hitQ: .8, hitDecay: .018, body: 210, bodyDecay: .045, bodyGain: .9, up: .22, upF: 1500 },
+  typewriter: { click: 1, clickF: 3000, clickQ: 2, hit: 1800, hitQ: .7, hitDecay: .03, body: 330, bodyDecay: .06, bodyGain: .6, up: .15, upF: 2400, ring: 2200 },
+};
+
+function biquad(type, f, q, sr) {
+  // Coeficientes RBJ; filtro aplicado en el bucle de abajo.
+  const w = 2 * Math.PI * f / sr, cs = Math.cos(w), al = Math.sin(w) / (2 * q);
+  let b0, b1, b2;
+  if (type === "bp") { b0 = al; b1 = 0; b2 = -al; }
+  else if (type === "hp") { b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = (1 + cs) / 2; }
+  else { b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = (1 - cs) / 2; }
+  const a0 = 1 + al, a1 = -2 * cs, a2 = 1 - al;
+  const c = [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0];
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  return (x) => { const y = c[0] * x + c[1] * x1 + c[2] * x2 - c[3] * y1 - c[4] * y2; x2 = x1; x1 = x; y2 = y1; y1 = y; return y; };
+}
+
+/** Una muestra de sonido. kind: "down" | "up"; big: barra espaciadora, Intro… */
+function synth(p, kind, big, seed) {
+  if (p.gen) return genSynth(p, kind, big, seed);
+  const sr = actx.sampleRate, len = Math.floor(sr * (big ? .11 : .08) * (p.ring ? 1.6 : 1));
+  const buf = actx.createBuffer(1, len, sr), out = buf.getChannelData(0);
+  let s = seed * 9301 + 49297;
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280 * 2 - 1; };
+  const jit = 1 + (rnd() * .08);
+  const pitch = (big ? .62 : 1) * jit;
+
+  if (kind === "up") {
+    // Al soltar: el vástago vuelve arriba, un golpecito más agudo y flojo.
+    const f = biquad("bp", p.upF * pitch, 1.4, sr);
+    for (let i = 0; i < len; i++) {
+      const t = i / sr, env = Math.exp(-t / .006);
+      out[i] = f(rnd()) * env * p.up * 1.6;
+    }
+    if (big) addRattle(out, sr, rnd, .3);
+    return normalize(buf, out, .5);
+  }
+
+  const hit = biquad("bp", p.hit * pitch, p.hitQ, sr);
+  const low = biquad("lp", 900 * pitch, .7, sr);
+  const click = p.click ? biquad("bp", p.clickF * jit, p.clickQ, sr) : null;
+  const pre = p.pre || 0;          // el clic suena justo antes de llegar al fondo
+  const bodyF = p.body * pitch, bodyF2 = bodyF * 2.37;
+  for (let i = 0; i < len; i++) {
+    const t = i / sr;
+    let v = 0;
+    // Clic (pieza del interruptor)
+    if (click) {
+      const env = Math.exp(-t / .0025);
+      v += click(rnd()) * env * 2.4;
+    }
+    // Leve roce del bache táctil (marrón)
+    if (p.bump && t < .004) v += hit(rnd()) * (1 - t / .004) * p.bump;
+    // Golpe contra el fondo
+    const tb = t - pre;
+    if (tb >= 0) {
+      const env = Math.exp(-tb / (p.hitDecay * (big ? 1.4 : 1)));
+      const n = rnd();
+      v += hit(n) * env * 1.6 + low(n) * env * (big ? 1.1 : .5);
+      // Cuerpo: tecla, placa y carcasa resonando
+      const benv = Math.exp(-tb / (p.bodyDecay * (big ? 1.6 : 1)));
+      v += (Math.sin(2 * Math.PI * bodyF * tb) + .45 * Math.sin(2 * Math.PI * bodyF2 * tb)) * benv * p.bodyGain * .5;
+      if (p.ring) v += Math.sin(2 * Math.PI * p.ring * jit * tb) * Math.exp(-tb / .09) * .08;
+    }
+    out[i] = v;
+  }
+  if (big) addRattle(out, sr, rnd, .5);
+  return normalize(buf, out, big ? 1 : .85);
+}
+// Los estabilizadores de las teclas largas meten un segundo golpecito.
+function addRattle(out, sr, rnd, g) {
+  const at = Math.floor(sr * .007), f = biquad("bp", 2600, 2, sr);
+  for (let i = 0; i < sr * .01 && at + i < out.length; i++) out[at + i] += f(rnd()) * Math.exp(-i / sr / .003) * g;
+}
+function normalize(buf, out, peak) {
+  let m = 0;
+  for (let i = 0; i < out.length; i++) m = Math.max(m, Math.abs(out[i]));
+  if (m > 0) for (let i = 0; i < out.length; i++) out[i] *= peak / m;
+  const fade = Math.min(200, out.length);  // sin chasquido al final
+  for (let i = 0; i < fade; i++) out[out.length - 1 - i] *= i / fade;
+  return buf;
+}
+
+// ── Sonidos de juego: síntesis tonal, no de interruptor ───────────────
+//  gen(kind, t, rnd, pitch, big) devuelve la muestra en el instante t (s).
+//  "up" es el sonido al soltar; si devuelve 0, soltar no suena.
+const TAU = 2 * Math.PI;
+// Pentatónica mayor en dos octavas: cualquier combinación suena bien.
+const PENTA = [1, 9/8, 5/4, 3/2, 5/3, 2, 9/4, 5/2, 3, 10/3].map((r) => r * .75);
+function phaseOsc() {  // oscilador con frecuencia variable sin saltos de fase
+  let ph = 0;
+  return (f, sr) => { ph += TAU * f / sr; return ph; };
+}
+Object.assign(PROFILES, {
+  neon: { len: .09, gen(kind, t, rnd, pitch, big, osc, sr) {
+    if (kind === "up") return Math.sin(osc(2400 * pitch, sr)) * Math.exp(-t / .01) * .35;
+    // Pitido que cae de tono y se satura un poco, con un «tic» de ruido delante.
+    const f = 1300 * pitch * (1 + 1.6 * Math.exp(-t / .006));
+    return Math.tanh(2.5 * Math.sin(osc(f, sr))) * Math.exp(-t / (big ? .05 : .03)) * .8
+      + rnd() * Math.exp(-t / .0012) * .6;
+  } },
+  laser: { len: .11, gen(kind, t, rnd, pitch, big, osc, sr) {
+    if (kind === "up") return 0;
+    const f = 300 + 3200 * pitch * Math.exp(-t / (big ? .035 : .022));
+    const v = Math.sin(osc(f, sr));
+    return (v + .3 * Math.sign(v)) * Math.exp(-t / .045) * .7;
+  } },
+  retro: { len: .075, gen(kind, t, rnd, pitch, big, osc, sr) {
+    if (kind === "up") return 0;
+    // Dos notas rápidas en onda cuadrada, como las consolas de 8 bits.
+    const f = (t < .028 ? 660 : 990) * pitch;
+    return (Math.sin(osc(f, sr)) > 0 ? 1 : -1) * (t < .065 ? 1 : 0) * Math.exp(-t / .05) * .35;
+  } },
+  bubble: { len: .1, gen(kind, t, rnd, pitch, big, osc, sr) {
+    const g = kind === "up" ? .3 : 1, base = (kind === "up" ? 900 : 420) * pitch;
+    // Tono que sube rápido, como una gota que cae en agua.
+    const f = base * (1 + 1.7 * (1 - Math.exp(-t / .018)));
+    return Math.sin(osc(f, sr)) * Math.min(1, t / .002) * Math.exp(-t / (kind === "up" ? .015 : .035)) * g;
+  } },
+  crystal: { len: .45, musical: true, gen(kind, t, rnd, pitch, big, osc, sr) {
+    if (kind === "up") return 0;
+    // Campanita FM: portadora + moduladora inarmónica que se apaga antes.
+    const fc = 880 * (big ? .5 : 1), idx = 2.2 * Math.exp(-t / .04);
+    return Math.sin(TAU * fc * t + idx * Math.sin(TAU * fc * 3.5 * t)) * Math.exp(-t / .18) * .7;
+  } },
+  wood: { len: .08, gen(kind, t, rnd, pitch, big, osc, sr) {
+    const g = kind === "up" ? .25 : 1, f = (big ? 520 : 820) * pitch;
+    return (Math.sin(TAU * f * t) + .5 * Math.sin(TAU * f * 2.76 * t)) * Math.exp(-t / .022) * g
+      + rnd() * Math.exp(-t / .0015) * .4 * g;
+  } },
+});
+
+function genSynth(p, kind, big, seed) {
+  const sr = actx.sampleRate, len = Math.floor(sr * p.len * (big ? 1.3 : 1));
+  const buf = actx.createBuffer(1, len, sr), out = buf.getChannelData(0);
+  let s = seed * 9301 + 49297;
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280 * 2 - 1; };
+  // Los musicales no varían de tono: la nota la pone la posición de la tecla.
+  const pitch = (big && !p.musical ? .7 : 1) * (p.musical ? 1 : 1 + rnd() * .05);
+  const osc = phaseOsc();
+  for (let i = 0; i < len; i++) out[i] = p.gen(kind, i / sr, rnd, pitch, big, osc, sr);
+  return normalize(buf, out, kind === "up" ? .45 : (big ? .9 : .8));
+}
+
+const VARIANTS = 6;
+function bank(name) {
+  if (banks[name]) return banks[name];
+  const p = PROFILES[name], b = { down: [], up: [], bigDown: [], bigUp: [] };
+  for (let i = 0; i < VARIANTS; i++) {
+    b.down.push(synth(p, "down", false, i + 1));
+    b.up.push(synth(p, "up", false, i + 11));
+    b.bigDown.push(synth(p, "down", true, i + 21));
+    b.bigUp.push(synth(p, "up", true, i + 31));
+  }
+  return banks[name] = b;
+}
+
+let lastVar = -1;
+function clack(kind, big, pan) {
+  if (cfg.sw === "off" || !PROFILES[cfg.sw]) return;
+  if (kind === "up" && !cfg.up) return;
+  const ac = audio(); if (!ac) return;
+  const b = bank(cfg.sw), list = big ? (kind === "up" ? b.bigUp : b.bigDown) : (kind === "up" ? b.up : b.down);
+  let i = Math.floor(Math.random() * list.length);
+  if (i === lastVar) i = (i + 1) % list.length;
+  lastVar = i;
+  const src = ac.createBufferSource();
+  src.buffer = list[i];
+  // Los sonidos musicales dan una nota de la escala según dónde está la
+  // tecla (graves a la izquierda, agudos a la derecha): escribir suena a melodía.
+  src.playbackRate.value = PROFILES[cfg.sw].musical
+    ? PENTA[Math.max(0, Math.min(PENTA.length - 1, Math.floor((pan + 1) / 2 * PENTA.length)))]
+    : 1 + (Math.random() - .5) * .06;
+  const g = ac.createGain();
+  g.gain.value = .8 + Math.random() * .25;
+  let node = src.connect(g);
+  if (ac.createStereoPanner) {
+    const sp = ac.createStereoPanner();
+    sp.pan.value = Math.max(-1, Math.min(1, pan * .7));
+    node = node.connect(sp);
+  }
+  node.connect(master);
+  src.start();
+}
+
+function haptic(kind) {
+  if (!cfg.haptic) return;
+  if (native && native.haptic) native.haptic(kind);
+  else if (navigator.vibrate) navigator.vibrate(kind === "up" ? 4 : 10);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Distribuciones
+// ═══════════════════════════════════════════════════════════════════
+//  Cada tecla: [código evdev, ancho en unidades, etiquetas…]. Un número solo
+//  es un hueco. Las etiquetas impresas dependen de cfg.print; el código es el
+//  mismo, así que escribe lo que diga la distribución del PC.
+const K = {
+  ESC: 1, BS: 14, TAB: 15, ENTER: 28, LCTRL: 29, LSHIFT: 42, RSHIFT: 54, LALT: 56, SPACE: 57, CAPS: 58,
+  RCTRL: 97, RALT: 100, LMETA: 125, RMETA: 126, MENU: 127, ISO: 86,
+  INS: 110, DEL: 111, HOME: 102, END: 107, PGUP: 104, PGDN: 109, UP: 103, DOWN: 108, LEFT: 105, RIGHT: 106,
+  PRT: 99, SCRL: 70, PAUSE: 119, NUM: 69,
+};
+const FKEYS = [59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 87, 88];
+
+// Etiquetas de las teclas de caracteres: [código, normal, mayúscula, AltGr]
+const PRINT = {
+  es: {
+    41: ["º", "ª", "\\"], 2: ["1", "!", "|"], 3: ["2", "\"", "@"], 4: ["3", "·", "#"], 5: ["4", "$", "~"], 6: ["5", "%", "€"],
+    7: ["6", "&", "¬"], 8: ["7", "/"], 9: ["8", "("], 10: ["9", ")"], 11: ["0", "="], 12: ["'", "?"], 13: ["¡", "¿"],
+    26: ["`", "^", "["], 27: ["+", "*", "]"], 39: ["Ñ"], 40: ["´", "¨", "{"], 43: ["Ç", "", "}"], 86: ["<", ">"],
+    51: [",", ";"], 52: [".", ":"], 53: ["-", "_"],
+  },
+  us: {
+    41: ["`", "~"], 2: ["1", "!"], 3: ["2", "@"], 4: ["3", "#"], 5: ["4", "$"], 6: ["5", "%"], 7: ["6", "^"], 8: ["7", "&"],
+    9: ["8", "*"], 10: ["9", "("], 11: ["0", ")"], 12: ["-", "_"], 13: ["=", "+"], 26: ["[", "{"], 27: ["]", "}"],
+    39: [";", ":"], 40: ["'", "\""], 43: ["\\", "|"], 86: ["\\", "|"], 51: [",", "<"], 52: [".", ">"], 53: ["/", "?"],
+  },
+};
+const LETTERS = "QWERTYUIOP ASDFGHJKL ZXCVBNM";
+const LETTER_CODES = [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 0, 30, 31, 32, 33, 34, 35, 36, 37, 38, 0, 44, 45, 46, 47, 48, 49, 50];
+const NAMES = {
+  1: "Esc", 14: "⌫", 15: "Tab ⇥", 28: "Intro", 29: "Ctrl", 42: "⇧ Mayús", 54: "⇧ Mayús", 56: "Alt", 57: "",
+  58: "Bloq Mayús", 97: "Ctrl", 100: "Alt Gr", 125: "❖", 126: "❖", 127: "☰",
+  110: "Insert", 111: "Supr", 102: "Inicio", 107: "Fin", 104: "Re Pág", 109: "Av Pág",
+  103: "▲", 108: "▼", 105: "◀", 106: "▶", 99: "Impr Pant", 70: "Bloq Despl", 119: "Pausa", 69: "Bloq Num",
+  98: "/", 55: "*", 74: "−", 78: "+", 96: "Intro", 83: ",", 82: "0", 79: "1", 80: "2", 81: "3", 75: "4", 76: "5", 77: "6", 71: "7", 72: "8", 73: "9",
+  113: "🔇", 114: "🔉", 115: "🔊", 164: "⏯", 163: "⏭", 165: "⏮",
+};
+const NAMES_US = { 14: "Backspace", 15: "Tab", 28: "Enter", 42: "Shift", 54: "Shift", 58: "Caps Lock", 100: "Alt Gr",
+  110: "Ins", 111: "Del", 102: "Home", 107: "End", 104: "PgUp", 109: "PgDn", 99: "PrtSc", 70: "ScrLk", 119: "Pause", 69: "Num", 96: "Enter", 83: "." };
+const MODS = new Set([1, 14, 15, 28, 29, 42, 54, 56, 58, 97, 100, 125, 126, 127, 110, 111, 102, 107, 104, 109, 99, 70, 119, 69, 96, 0xF0]);
+const BIG = new Set([57, 28, 96, 14, 42, 54, 15, 58, 78, 82]);
+const NUMPAD = new Set([98, 55, 74, 78, 96, 83, 82, 79, 80, 81, 75, 76, 77, 71, 72, 73]);
+const FN = 0xF0;  // tecla Fn: no va al PC, cambia de capa
+
+function letterRow(from, to) {
+  const out = [];
+  for (let i = from; i < to; i++) out.push([LETTER_CODES[i], 1]);
+  return out;
+}
+
+// Bloque principal ISO (15 u de ancho).
+function mainBlock(sixty) {
+  return [
+    [[sixty ? K.ESC : 41, 1], [2, 1], [3, 1], [4, 1], [5, 1], [6, 1], [7, 1], [8, 1], [9, 1], [10, 1], [11, 1], [12, 1], [13, 1], [K.BS, 2]],
+    [[K.TAB, 1.5], ...letterRow(0, 10), [26, 1], [27, 1], [K.ENTER, 1.5, "iso"]],
+    [[K.CAPS, 1.75], ...letterRow(11, 20), [39, 1], [40, 1], [43, 1], [0, 1.25, "isogap"]],
+    [[K.LSHIFT, 1.25], [K.ISO, 1], ...letterRow(21, 28), [51, 1], [52, 1], [53, 1], [K.RSHIFT, 2.75]],
+    sixty
+      ? [[K.LCTRL, 1.25], [K.LMETA, 1.25], [K.LALT, 1.25], [K.SPACE, 6.25], [K.RALT, 1.25], [FN, 1.25], [K.MENU, 1.25], [K.RCTRL, 1.25]]
+      : [[K.LCTRL, 1.25], [K.LMETA, 1.25], [K.LALT, 1.25], [K.SPACE, 6.25], [K.RALT, 1.25], [K.RMETA, 1.25], [K.MENU, 1.25], [K.RCTRL, 1.25]],
+  ];
+}
+
+// Capa Fn del compacto: código pulsado → [código enviado, etiqueta pequeña]
+const FN_LAYER = {
+  1: [41, "º"], 2: [59, "F1"], 3: [60, "F2"], 4: [61, "F3"], 5: [62, "F4"], 6: [63, "F5"], 7: [64, "F6"], 8: [65, "F7"],
+  9: [66, "F8"], 10: [67, "F9"], 11: [68, "F10"], 12: [87, "F11"], 13: [88, "F12"], 14: [111, "Supr"],
+  23: [103, "▲"], 36: [105, "◀"], 37: [108, "▼"], 38: [106, "▶"], 22: [102, "Inicio"], 24: [107, "Fin"],
+  21: [104, "RePág"], 35: [109, "AvPág"], 25: [99, "ImpPt"], 18: [110, "Ins"],
+  44: [165, "⏮"], 45: [164, "⏯"], 46: [163, "⏭"], 48: [114, "🔉"], 49: [115, "🔊"], 50: [113, "🔇"],
+};
+
+/** Lista de teclas posicionadas: {c, x, y, w, h, iso?} en unidades. */
+function buildLayout(kind) {
+  const keys = [];
+  const put = (rows, x0, y0) => {
+    rows.forEach((row, r) => {
+      let x = x0;
+      for (const k of row) {
+        const [c, w, flag] = k;
+        if (c && flag !== "isogap") keys.push({ c, x, y: y0 + r, w, h: flag === "iso" ? 2 : 1, iso: flag === "iso" });
+        x += w;
+      }
+    });
+  };
+  if (kind === "sixty") {
+    put(mainBlock(true), 0, 0);
+    return { keys, w: 15, h: 5 };
+  }
+  // 100 %: fila de funciones, bloque principal, navegación y numérico.
+  const top = [[K.ESC, 1], [0, 1]];
+  FKEYS.forEach((c, i) => { top.push([c, 1]); if (i === 3 || i === 7) top.push([0, .5]); });
+  put([top], 0, 0);
+  put([[[K.PRT, 1], [K.SCRL, 1], [K.PAUSE, 1]]], 15.5, 0);
+  put([[[113, 1], [114, 1], [115, 1], [164, 1]]], 19, 0);
+  put(mainBlock(false), 0, 1.25);
+  put([[[K.INS, 1], [K.HOME, 1], [K.PGUP, 1]], [[K.DEL, 1], [K.END, 1], [K.PGDN, 1]]], 15.5, 1.25);
+  put([[[K.UP, 1]]], 16.5, 4.25);
+  put([[[K.LEFT, 1], [K.DOWN, 1], [K.RIGHT, 1]]], 15.5, 5.25);
+  put([[[K.NUM, 1], [98, 1], [55, 1], [74, 1]], [[71, 1], [72, 1], [73, 1]], [[75, 1], [76, 1], [77, 1]], [[79, 1], [80, 1], [81, 1]]], 19, 1.25);
+  keys.push({ c: 78, x: 22, y: 2.25, w: 1, h: 2 });
+  keys.push({ c: 96, x: 22, y: 4.25, w: 1, h: 2 });
+  keys.push({ c: 82, x: 19, y: 5.25, w: 2, h: 1 });
+  keys.push({ c: 83, x: 21, y: 5.25, w: 1, h: 1 });
+  return { keys, w: 23, h: 6.25 };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Dibujar
+// ═══════════════════════════════════════════════════════════════════
+const board = document.getElementById("board"), pad = document.getElementById("pad");
+let keyEls = [], layout = null, unit = 60, unitY = 60;
+// Las teclas pueden ser algo más altas que anchas para aprovechar la pantalla
+// (en la tablet sobra alto): más blanco donde caer con el dedo.
+const MAX_STRETCH = 1.4;
+const GAP = 0.09;  // separación entre teclas, en unidades
+
+function labelHTML(c) {
+  const us = cfg.print === "us";
+  if (c === FN) return { main: "Fn", cls: "mod center" };
+  let i = LETTER_CODES.indexOf(c);
+  if (i >= 0) return { main: LETTERS[i], cls: "center" };
+  const fi = FKEYS.indexOf(c);
+  if (fi >= 0) return { main: "F" + (fi + 1), cls: "mod center small" };
+  const pr = PRINT[cfg.print][c];
+  if (pr) {
+    if (c === 39 && !us) return { main: "Ñ", cls: "center" };
+    if (c === 43 && !us) return { main: "Ç", alt: "}", cls: "center" };
+    return { main: pr[0], sh: pr[1], alt: pr[2] };
+  }
+  const name = (us && NAMES_US[c]) || NAMES[c] || "";
+  let cls = MODS.has(c) ? "mod" : "";
+  if (NUMPAD.has(c) && !MODS.has(c)) cls = "center";
+  if ([103, 108, 105, 106, 113, 114, 115, 164, 125, 126, 127].includes(c)) cls += " center";
+  if (c === K.ESC || c === K.ENTER || c === 96) cls += " accent";
+  return { main: name, cls };
+}
+
+// Posiciones posibles según el teclado. "abajo" es la de por defecto: la mano
+// descansa en la mesa, como con un teclado de verdad.
+const POSITIONS = {
+  full: [["abajo", "Abajo", "pegado al borde"], ["centro", "Centrado", ""]],
+  sixty: [["abajo", "Abajo", "trackpad encima"], ["lado", "Abajo", "trackpad al lado"], ["centro", "Clásico", "trackpad debajo"]],
+};
+function posFor() {
+  const list = POSITIONS[cfg.layout];
+  return list.some((p) => p[0] === cfg.pos) ? cfg.pos : list[0][0];
+}
+function markPos() {
+  const box = document.getElementById("opt-pos"), cur = posFor();
+  box.textContent = "";
+  for (const [v, name, sub] of POSITIONS[cfg.layout]) {
+    const b = document.createElement("button");
+    b.dataset.v = v;
+    b.className = v === cur ? "on" : "";
+    b.textContent = name;
+    if (sub) { const sm = document.createElement("small"); sm.textContent = sub; b.appendChild(sm); }
+    b.onclick = () => { cfg.pos = v; save(); render(); };
+    box.appendChild(b);
+  }
+}
+
+function render() {
+  layout = buildLayout(cfg.layout);
+  const sixty = cfg.layout === "sixty";
+  pad.hidden = !sixty;
+  document.getElementById("pad-opts").hidden = !sixty;
+  document.getElementById("led-fn").hidden = !sixty;
+  const stage = document.getElementById("stage");
+  const pos = posFor();
+  stage.className = "pos-" + pos;
+  markPos();
+  const bottomPad = pos === "centro" ? 18 : 6;
+  const W = stage.clientWidth - 24, H = stage.clientHeight - bottomPad;
+  const margin = 0.35;  // borde de la placa, en unidades
+  const stretch = Math.min(MAX_STRETCH + .1, cfg.tall / 100);
+  const lw = layout.w + margin * 2, lh = layout.h + margin * 2;
+  if (sixty && pos === "lado") {
+    // Teclado a la izquierda, trackpad a la derecha; los dos tocan el borde.
+    const padU = 6.5;
+    unit = Math.min((W - 14) / (lw + padU), H / lh);
+    unitY = Math.min(unit * stretch, H / lh);
+  } else if (sixty) {
+    // Teclado a todo lo ancho; el trackpad, con lo que sobre (mínimo ~30 %).
+    unit = Math.min(W / lw, (H * 0.66) / lh);
+    unitY = Math.min(unit * stretch, (H * 0.66) / lh);
+  } else {
+    unit = Math.min(W / lw, H / lh);
+    unitY = Math.min(unit * stretch, (H * 0.97) / lh);
+  }
+  const bw = lw * unit, bh = lh * unitY;
+  board.style.width = bw + "px";
+  board.style.height = bh + "px";
+  board.style.setProperty("--fs", Math.max(10, Math.round(unit * .27)) + "px");
+  if (sixty && pos === "lado") {
+    pad.style.width = Math.max(160, W - bw - 14) + "px";
+    pad.style.height = bh + "px";
+  } else if (sixty) {
+    const ph = Math.max(140, H - bh - 14);
+    pad.style.width = Math.min(bw * 0.62, ph * 2.1) + "px";
+    pad.style.height = ph + "px";
+  }
+  board.textContent = "";
+  keyEls = [];
+  const g = GAP * unit;
+  for (const k of layout.keys) {
+    const el = document.createElement("div");
+    const lab = labelHTML(k.c);
+    el.className = "key " + (lab.cls || "");
+    if (BIG.has(k.c) || MODS.has(k.c)) el.classList.add("center");
+    el.dataset.c = k.c;
+    el.style.left = (margin + k.x) * unit + g / 2 + "px";
+    el.style.top = (margin + k.y) * unitY + g / 2 + "px";
+    el.style.width = k.w * unit - g + "px";
+    el.style.height = k.h * unitY - g + "px";
+    el.style.setProperty("--h", Math.round((k.x / layout.w) * 330));
+    if (k.iso) {
+      // Intro ISO en «L» invertida: 1,5 u arriba, 1,25 u abajo.
+      el.classList.add("iso");
+      const cut = (0.25 * unit) / (k.w * unit - g) * 100;
+      el.style.setProperty("--iso", `polygon(0 0, 100% 0, 100% 100%, ${cut}% 100%, ${cut}% 50%, 0 50%)`);
+    }
+    const fn = sixty && FN_LAYER[k.c];
+    if (fn) el.classList.add("hasfn");
+    el.innerHTML = '<div class="glow"></div><div class="cap"></div><div class="lbl"></div>';
+    const lbl = el.lastChild;
+    if (lab.sh) { const s = document.createElement("span"); s.className = "sh"; s.textContent = lab.sh; lbl.appendChild(s); }
+    lbl.appendChild(document.createTextNode(lab.main));
+    if (lab.alt) { const s = document.createElement("span"); s.className = "alt"; s.textContent = lab.alt; lbl.appendChild(s); }
+    if (fn) { const s = document.createElement("span"); s.className = "fnl"; s.textContent = fn[1]; lbl.appendChild(s); }
+    if (k.iso) lbl.style.paddingLeft = 0.25 * unit + 9 + "px";
+    k.el = el;
+    keyEls.push(el);
+    board.appendChild(el);
+  }
+  board.classList.toggle("rgb", cfg.rgb);
+  showLeds();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Toques en el teclado (multitáctil: cada dedo, su tecla)
+// ═══════════════════════════════════════════════════════════════════
+const touches = new Map();   // pointerId → {key, code}
+const sentDown = new Map();  // código enviado → nº de dedos que lo mantienen
+let fnHeld = 0, fnLocked = false, lastFnTap = 0;
+
+function keyAt(x, y) {
+  const r = board.getBoundingClientRect(), m = 0.35;
+  const ux = (x - r.left) / unit - m, uy = (y - r.top) / unitY - m;
+  let best = null, bestD = 1e9;
+  for (const k of layout.keys) {
+    // Intro ISO: la parte de abajo empieza 0,25 u más a la derecha.
+    const left = k.iso && uy >= k.y + 1 ? k.x + 0.25 : k.x;
+    const dx = ux < left ? left - ux : ux > k.x + k.w ? ux - k.x - k.w : 0;
+    const dy = uy < k.y ? k.y - uy : uy > k.y + k.h ? uy - k.y - k.h : 0;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = k; }
+  }
+  // Toques en el borde de la placa cuentan para la tecla más cercana.
+  return bestD <= 0.25 ? best : null;
+}
+
+function press(code, down) {
+  const n = sentDown.get(code) || 0;
+  if (down) { sentDown.set(code, n + 1); if (n === 0) send({ t: "k", c: code, d: true }); }
+  else if (n > 0) { if (n === 1) { sentDown.delete(code); send({ t: "k", c: code, d: false }); } else sentDown.set(code, n - 1); }
+}
+
+function setFn() {
+  board.classList.toggle("fn-on", fnHeld > 0 || fnLocked);
+  document.getElementById("led-fn").classList.toggle("on", fnHeld > 0 || fnLocked);
+  for (const k of layout.keys) if (k.c === FN) k.el.classList.toggle("latched", fnLocked);
+}
+
+// Una palma apoyada da un contacto enorme: la yema de un dedo mide 7-10 mm,
+// la palma pasa de 20. En la WebView las medidas vienen en px CSS (dp,
+// 160 por pulgada ≈ 6,3 por mm).
+const PALM_PX = 95;
+function isPalm(e) { return cfg.palm && e.pointerType === "touch" && Math.max(e.width || 0, e.height || 0) >= PALM_PX; }
+const palms = new Set();
+
+board.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  if (isPalm(e)) { palms.add(e.pointerId); return; }
+  const k = keyAt(e.clientX, e.clientY);
+  if (!k) return;
+  board.setPointerCapture && board.setPointerCapture(e.pointerId);
+  let code = k.c;
+  if (code === FN) {
+    const now = performance.now();
+    if (now - lastFnTap < 320) fnLocked = !fnLocked;
+    lastFnTap = now;
+    fnHeld++;
+    setFn();
+    code = 0;
+  } else if ((fnHeld > 0 || fnLocked) && cfg.layout === "sixty" && FN_LAYER[code]) {
+    code = FN_LAYER[code][0];
+  }
+  touches.set(e.pointerId, { key: k, code });
+  if (code) press(code, true);
+  k.el.classList.add("down");
+  const pan = (k.x + k.w / 2) / layout.w * 2 - 1;
+  clack("down", BIG.has(k.c), pan);
+  haptic("down");
+});
+
+function lift(e) {
+  const t = touches.get(e.pointerId);
+  if (!t) return;
+  touches.delete(e.pointerId);
+  if (t.key.c === FN) { fnHeld = Math.max(0, fnHeld - 1); setFn(); }
+  if (t.code) press(t.code, false);
+  // Si otro dedo sigue en la misma tecla, que siga abajo.
+  let still = false;
+  for (const o of touches.values()) if (o.key === t.key) still = true;
+  if (!still) t.key.el.classList.remove("down");
+  if (e.type === "pointerup") {
+    clack("up", BIG.has(t.key.c), (t.key.x + t.key.w / 2) / layout.w * 2 - 1);
+  }
+}
+board.addEventListener("pointerup", (e) => { palms.delete(e.pointerId); lift(e); });
+board.addEventListener("pointercancel", (e) => { palms.delete(e.pointerId); lift(e); });
+// Si el contacto crece hasta ser una palma (la mano se apoya encima de una
+// tecla), esa tecla se suelta sin sonido.
+board.addEventListener("pointermove", (e) => {
+  if (!touches.has(e.pointerId) || !isPalm(e)) return;
+  lift({ pointerId: e.pointerId, type: "pointercancel" });
+  palms.add(e.pointerId);
+});
+
+function releaseAll(sendUp = true) {
+  if (sendUp) for (const c of sentDown.keys()) send({ t: "k", c, d: false });
+  sentDown.clear();
+  touches.clear();
+  fnHeld = 0; setFn();
+  for (const el of keyEls) el.classList.remove("down");
+  padRelease();
+}
+document.addEventListener("visibilitychange", () => { if (document.hidden) releaseAll(); });
+window.addEventListener("contextmenu", (e) => e.preventDefault());
+
+// ═══════════════════════════════════════════════════════════════════
+//  Trackpad
+// ═══════════════════════════════════════════════════════════════════
+//  1 dedo: mover; toque: clic; toque y arrastre (doble toque mantenido):
+//  arrastrar. 2 dedos: desplazar; toque con dos: clic derecho; 3: central.
+const surface = pad.querySelector(".surface");
+const pts = new Map();   // pointerId → {x, y, x0, y0, t0}
+let gesture = null;      // {start, maxFingers, moved, lastX, lastY}
+let lastTapEnd = 0, dragging = false, scrollRest = { x: 0, y: 0 };
+let fling = null;
+
+function centroid() {
+  let x = 0, y = 0;
+  for (const p of pts.values()) { x += p.x; y += p.y; }
+  return { x: x / pts.size, y: y / pts.size };
+}
+function accel(d, dt) {
+  // Aceleración suave: despacio = preciso, rápido = cruza la pantalla.
+  const v = Math.abs(d) / Math.max(dt, 1);           // px por ms
+  const gain = 0.6 + Math.min(2.6, v * 1.4);
+  return d * gain * (cfg.speed / 16);
+}
+
+surface.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  if (isPalm(e)) return;  // la mano apoyada no mueve el cursor
+  surface.setPointerCapture && surface.setPointerCapture(e.pointerId);
+  if (fling) { cancelAnimationFrame(fling); fling = null; }
+  const now = performance.now();
+  pts.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY });
+  if (pts.size === 1) {
+    gesture = { start: now, maxFingers: 1, moved: 0, last: now };
+    // Doble toque y mantener: arrastrar.
+    if (now - lastTapEnd < 260) { dragging = true; send({ t: "b", b: 0, d: true }); }
+  } else if (gesture) {
+    gesture.maxFingers = Math.max(gesture.maxFingers, pts.size);
+  }
+  const c = centroid(); gesture.cx = c.x; gesture.cy = c.y;
+  pad.classList.add("touching");
+  glowAt(e);
+});
+
+let vel = { x: 0, y: 0 };
+surface.addEventListener("pointermove", (e) => {
+  const p = pts.get(e.pointerId);
+  if (!p || !gesture) return;
+  p.x = e.clientX; p.y = e.clientY;
+  const c = centroid(), now = performance.now();
+  const dx = c.x - gesture.cx, dy = c.y - gesture.cy, dt = now - gesture.last;
+  gesture.cx = c.x; gesture.cy = c.y; gesture.last = now;
+  gesture.moved += Math.hypot(dx, dy);
+  if (pts.size === 1 && gesture.maxFingers === 1) {
+    send({ t: "m", x: accel(dx, dt), y: accel(dy, dt) });
+  } else if (pts.size >= 2) {
+    const k = cfg.natural ? 1 : -1;
+    scroll(dx * k * 4, dy * k * 4);
+    vel = { x: dx * k * 4 / Math.max(dt, 1), y: dy * k * 4 / Math.max(dt, 1) };
+  }
+  glowAt(e);
+});
+
+function scroll(x, y) {
+  scrollRest.x += x; scrollRest.y += y;
+  const ix = Math.trunc(scrollRest.x), iy = Math.trunc(scrollRest.y);
+  if (ix || iy) { scrollRest.x -= ix; scrollRest.y -= iy; send({ t: "s", x: -ix, y: iy }); }
+}
+
+function padUp(e) {
+  if (!pts.has(e.pointerId)) return;
+  pts.delete(e.pointerId);
+  if (pts.size > 0) { const c = centroid(); gesture.cx = c.x; gesture.cy = c.y; return; }
+  pad.classList.remove("touching");
+  const now = performance.now(), g = gesture;
+  gesture = null;
+  if (!g) return;
+  if (dragging) { dragging = false; send({ t: "b", b: 0, d: false }); return; }
+  const tap = now - g.start < 220 && g.moved < 12;
+  if (tap && e.type === "pointerup") {
+    const b = g.maxFingers >= 3 ? 1 : g.maxFingers === 2 ? 2 : 0;
+    send({ t: "b", b, d: true }); send({ t: "b", b, d: false });
+    clack("up", false, 0); haptic("up");
+    if (b === 0) lastTapEnd = now;
+  } else if (g.maxFingers >= 2 && Math.hypot(vel.x, vel.y) > 0.3) {
+    // Inercia al soltar dos dedos rápido.
+    let v = { x: vel.x * 16, y: vel.y * 16 };
+    const step = () => {
+      v.x *= 0.93; v.y *= 0.93;
+      scroll(v.x, v.y);
+      fling = Math.hypot(v.x, v.y) > 0.5 ? requestAnimationFrame(step) : null;
+    };
+    fling = requestAnimationFrame(step);
+  }
+  vel = { x: 0, y: 0 };
+}
+surface.addEventListener("pointerup", padUp);
+surface.addEventListener("pointercancel", padUp);
+function padRelease() {
+  pts.clear(); gesture = null;
+  if (dragging) { dragging = false; send({ t: "b", b: 0, d: false }); }
+  pad.classList.remove("touching");
+}
+function glowAt(e) {
+  const r = surface.getBoundingClientRect();
+  surface.style.setProperty("--px", ((e.clientX - r.left) / r.width * 100) + "%");
+  surface.style.setProperty("--py", ((e.clientY - r.top) / r.height * 100) + "%");
+}
+
+// Botones físicos del trackpad (abajo): se pueden mantener y arrastrar con otro dedo.
+for (const el of pad.querySelectorAll(".btns div")) {
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    el.setPointerCapture && el.setPointerCapture(e.pointerId);
+    el.classList.add("down");
+    send({ t: "b", b: +el.dataset.b, d: true });
+    clack("down", false, el.dataset.b === "0" ? -.3 : .3); haptic("down");
+  });
+  const up = (e) => {
+    if (!el.classList.contains("down")) return;
+    el.classList.remove("down");
+    send({ t: "b", b: +el.dataset.b, d: false });
+    if (e.type === "pointerup") clack("up", false, 0);
+  };
+  el.addEventListener("pointerup", up);
+  el.addEventListener("pointercancel", up);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  Ajustes
+// ═══════════════════════════════════════════════════════════════════
+const sheet = document.getElementById("sheet");
+document.getElementById("gear").onclick = () => { releaseAll(); sheet.classList.add("open"); };
+sheet.querySelector(".shade").onclick = () => sheet.classList.remove("open");
+
+function seg(id, key, after) {
+  const box = document.getElementById(id);
+  const mark = () => box.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === cfg[key]));
+  box.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    cfg[key] = b.dataset.v; save(); mark(); after && after();
+  });
+  mark();
+}
+function toggle(id, key, after) {
+  const b = document.getElementById(id);
+  b.classList.toggle("on", !!cfg[key]);
+  b.onclick = () => { cfg[key] = !cfg[key]; save(); b.classList.toggle("on", cfg[key]); after && after(); };
+}
+function applyTheme() { document.documentElement.dataset.theme = cfg.theme; board.classList.toggle("rgb", cfg.rgb); }
+
+seg("opt-layout", "layout", render);
+toggle("opt-palm", "palm");
+const tall = document.getElementById("opt-tall");
+tall.value = cfg.tall;
+tall.oninput = () => { cfg.tall = +tall.value; save(); render(); };
+seg("opt-switch", "sw", () => {
+  // Que se oiga el interruptor elegido.
+  if (cfg.sw !== "off") { audio(); bank(cfg.sw); clack("down", false, 0); setTimeout(() => clack("up", false, 0), 110); }
+});
+seg("opt-theme", "theme", applyTheme);
+seg("opt-print", "print", render);
+toggle("opt-haptic", "haptic", () => haptic("down"));
+toggle("opt-up", "up");
+toggle("opt-rgb", "rgb", applyTheme);
+toggle("opt-natural", "natural");
+const vol = document.getElementById("opt-vol");
+vol.value = cfg.vol;
+vol.oninput = () => { cfg.vol = +vol.value; setVolume(); save(); };
+vol.onchange = () => { audio(); clack("down", false, 0); };
+const speed = document.getElementById("opt-speed");
+speed.value = cfg.speed;
+speed.oninput = () => { cfg.speed = +speed.value; save(); };
+document.getElementById("leave").onclick = () => {
+  releaseAll();
+  if (native && native.disconnect) native.disconnect();
+  else { try { ws.onclose = null; ws.close(); } catch (_) {} toast("Desconectado. Recarga para volver."); }
+};
+
+let toastT = 0;
+function toast(text) {
+  const t = document.getElementById("toast");
+  t.textContent = text; t.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+// El audio se desbloquea con el primer toque; los sonidos se preparan antes
+// de que haga falta el primero.
+document.addEventListener("pointerdown", () => { if (audio() && cfg.sw !== "off") bank(cfg.sw); }, { once: true, capture: true });
+
+let resizeT = 0;
+window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { releaseAll(); render(); }, 120); });
+applyTheme();
+render();
+connect();
+setConn();
+</script>
+</body>
+</html>

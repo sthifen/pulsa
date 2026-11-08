@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pulsa</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; min-height: 100vh; background: #15171c; color: #e8eaef; padding: 16px;
+    font: 15px/1.45 Roboto, system-ui, sans-serif; display: flex; align-items: center; justify-content: center; }
+  main { width: 100%; max-width: 560px; }
+  h1 { margin: 0 0 16px; font-size: 24px; font-weight: 700; }
+  h1 small { display: block; color: #8e95a3; font-weight: 400; font-size: 14px; margin-top: 2px; }
+  section { background: #1d2027; border: 1px solid #2c3039; border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  h2 { margin: 0 0 10px; font-size: 15px; }
+  p { margin: 0 0 10px; color: #8e95a3; font-size: 13px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #8e95a3; margin-right: 6px; }
+  .dot.ok { background: #3fb950; }
+  input, button { font: inherit; border-radius: 10px; border: 1px solid #2c3039; padding: 10px 12px; }
+  input[type=text] { background: #15171c; color: #e8eaef; min-width: 0; flex: 1; margin-right: 8px; }
+  button { background: #ff7a45; color: #1b0f08; border: 0; font-weight: 600; box-shadow: 0 3px 0 #b54f25; transition: transform .08s, box-shadow .08s; }
+  button:active { transform: translateY(3px); box-shadow: 0 0 0 #b54f25; }
+  button:disabled { opacity: .4; }
+  button.quiet { background: none; color: #ff9666; padding: 4px 0; font-weight: 400; box-shadow: none; }
+  .row { display: flex; }
+  .pc { display: block; width: 100%; text-align: left; margin-bottom: 10px; }
+  .pc small { display: block; font-weight: 400; opacity: .75; }
+  #msg { color: #f0883e; font-size: 13px; min-height: 1em; margin-bottom: 8px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pulsa<small>Abre Pulsa en el PC y toca su nombre aquí.</small></h1>
+  <div id="msg"></div>
+  <section id="usb">
+    <h2>Por cable USB</h2>
+    <p id="usb-state"><span class="dot"></span>Buscando PC…</p>
+    <button id="usb-btn" disabled>Conectar por USB</button>
+  </section>
+  <section>
+    <h2>En tu WiFi</h2>
+    <div id="pcs"></div>
+    <p id="scan-state"><span class="dot"></span>Buscando tu PC…</p>
+    <button id="more" class="quiet">¿No aparece? Escribir la dirección</button>
+    <div id="manual" hidden>
+      <p>Es la dirección que muestra Pulsa en el PC.</p>
+      <div class="row"><input id="host" type="text" placeholder="192.168.1.50" autocomplete="off" autocapitalize="off" spellcheck="false"><button id="wifi-btn">Conectar</button></div>
+    </div>
+  </section>
+</main>
+<script>
+"use strict";
+var PORT = 8795, SCAN_PAUSE_MS = 8000;
+function $(id) { return document.getElementById(id); }
+function get(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (_) { return d; } }
+function set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
+window.onhashchange = function () { location.reload(); };
+
+// Al volver con "atrás" o "Desconectar" no se reconecta solo; tras un error sí.
+var auto = location.hash !== "#manual";
+if (location.hash === "#error") $("msg").textContent = "Se perdió la conexión con el PC. Reintentando…";
+var bridge = window.PulsaNative, connecting = false;
+
+function probe(host, port, done) {
+  var x = new XMLHttpRequest(), ended = false;
+  function end(info) { if (!ended) { ended = true; done(info); } }
+  x.open("GET", "http://" + host + ":" + port + "/info?" + Date.now());
+  x.timeout = 1500;
+  x.onload = function () {
+    var info = null;
+    try { if (x.status === 200) info = JSON.parse(x.responseText); } catch (_) {}
+    end(info && info.app === "pulsa" ? info : null);
+  };
+  x.onerror = x.ontimeout = function () { end(null); };
+  x.send();
+}
+function go(host, port) { connecting = true; location.href = "http://" + host + ":" + port + "/"; }
+function parseAddress(text) {
+  var m = /^(?:https?:\/\/)?([^\/:\s]+)(?::(\d+))?\/?$/i.exec(text.replace(/^\s+|\s+$/g, ""));
+  return m ? { host: m[1], port: parseInt(m[2], 10) || PORT } : null;
+}
+function showPcs(pcs) {
+  var box = $("pcs");
+  box.textContent = "";
+  pcs.forEach(function (pc) {
+    var b = document.createElement("button"), small = document.createElement("small");
+    b.className = "pc";
+    b.textContent = pc.name;
+    small.textContent = pc.host;
+    b.appendChild(small);
+    b.onclick = function () { bridge.rememberPc(pc.id); go(pc.host, pc.port); };
+    box.appendChild(b);
+  });
+}
+function uniquePcs(pcs) {
+  var seen = {};
+  return pcs.filter(function (pc) { var n = !(pc.id in seen); seen[pc.id] = true; return n; });
+}
+
+// Si hay cable manda el cable: la WiFi sólo entra sola cuando por USB no hay nada.
+var nextScan = 0, usbMissing = !bridge.usbWorks();
+function pollScan() {
+  if (connecting) return;
+  var s = JSON.parse(bridge.scanState()), last = bridge.lastPc();
+  s.pcs = uniquePcs(s.pcs);
+  showPcs(s.pcs);
+  for (var i = 0; auto && usbMissing && last && i < s.pcs.length; i++) {
+    if (s.pcs[i].id === last) { go(s.pcs[i].host, s.pcs[i].port); return; }
+  }
+  $("scan-state").innerHTML = s.pcs.length
+    ? '<span class="dot ok"></span>Toca tu PC para conectar.'
+    : '<span class="dot"></span>Buscando tu PC…';
+  if (!s.scanning && Date.now() >= nextScan) { nextScan = Date.now() + SCAN_PAUSE_MS; bridge.scan(PORT); }
+  setTimeout(pollScan, 700);
+}
+function pollUsb() {
+  if (connecting) return;
+  probe("localhost", PORT, function (info) {
+    if (connecting) return;
+    usbMissing = !info;
+    $("usb-state").innerHTML = info
+      ? '<span class="dot ok"></span>' + info.name + " por cable"
+      : '<span class="dot"></span>Buscando PC por USB…';
+    $("usb-btn").disabled = !info;
+    if (info && auto) { go("localhost", PORT); return; }
+    setTimeout(pollUsb, 1500);
+  });
+}
+
+$("more").onclick = function () { $("more").hidden = true; $("manual").hidden = false; $("host").focus(); };
+$("usb-btn").onclick = function () { bridge.rememberPc(""); go("localhost", PORT); };
+$("host").value = get("host", "");
+$("wifi-btn").onclick = function () {
+  var a = parseAddress($("host").value);
+  if (!a) { $("msg").textContent = "Escribe la dirección del PC, por ejemplo 192.168.1.50."; return; }
+  set("host", $("host").value);
+  $("msg").textContent = "Conectando…";
+  probe(a.host, a.port, function (info) {
+    if (info) { if (info.id) bridge.rememberPc(info.id); go(a.host, a.port); }
+    else $("msg").textContent = "No se pudo contactar con " + a.host + ":" + a.port + ". ¿Está Pulsa abierto en el PC y el cortafuegos deja pasar el puerto " + PORT + "?";
+  });
+};
+
+pollScan();
+if (bridge.usbWorks()) pollUsb(); else $("usb").hidden = true;
+</script>
+</body>
+</html>
