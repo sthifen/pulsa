@@ -208,7 +208,7 @@ void setup() {
   BLESecurity *security = new BLESecurity();
   security->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);
   security->setCapability(ESP_IO_CAP_NONE);
-  security->setInitEncryptionKeys(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+  security->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
 
   server = BLEDevice::createServer();
   server->setCallbacks(new ServerCallbacks());
