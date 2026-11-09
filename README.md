@@ -75,10 +75,12 @@ nombre; el otro equipo sólo tiene que confirmar.
 
 Para el modo USB/WiFi, en Linux (x86_64 o ARM64).
 
-**AppImage** (lo más fácil): descarga [`Pulsa-x86_64.AppImage`](https://github.com/sthifen/pulsa/releases/latest/download/Pulsa-x86_64.AppImage)
-(o [`Pulsa-aarch64.AppImage`](https://github.com/sthifen/pulsa/releases/latest/download/Pulsa-aarch64.AppImage)
-para Raspberry Pi), dale permiso de ejecución y ábrela con doble clic. Se abre una página en el navegador con el
-QR de la app, el código para la WiFi y los botones para arrancar con el ordenador o añadirlo al menú.
+**AppImage** (lo más fácil): descarga [`Pulsa-x86_64.AppImage`](https://github.com/sthifen/pulsa/releases/latest/download/Pulsa-x86_64.AppImage),
+dale permiso de ejecución y ábrela con doble clic. Es una app nativa de escritorio (GTK4 + libadwaita, lleva todo
+dentro): muestra el QR de la app, el código para la WiFi y tus tablets, avisa cuando una se conecta y tiene
+**Iniciar con el sistema**. Al cerrar la ventana sigue funcionando en segundo plano; se añade sola al menú.
+Para Raspberry Pi: [`Pulsa-aarch64.AppImage`](https://github.com/sthifen/pulsa/releases/latest/download/Pulsa-aarch64.AppImage)
+(sin ventana: la misma información en <http://localhost:8795/estado>).
 
 **En una línea** (se instala como servicio y arranca con la sesión):
 

@@ -52,6 +52,8 @@ pub struct AppState {
     pub port: u16,
     /// Tablets conectadas ahora mismo, para la página de estado.
     pub online: Mutex<BTreeMap<u64, String>>,
+    /// La última tablet que pidió el código (nombre, cuándo), para avisar en la ventana.
+    pub pair_request: Mutex<Option<(String, std::time::Instant)>>,
 }
 
 static NEXT_SESSION: AtomicU64 = AtomicU64::new(1);
@@ -167,6 +169,8 @@ impl Held {
 /// `false` si se fue antes.
 async fn pair(socket: &mut WebSocket, s: &AppState, who: &str, params: &WsParams) -> bool {
     tracing::info!("{who} quiere emparejarse por WiFi: código {}", s.pairing.code());
+    let label = if params.name.is_empty() { who.to_string() } else { params.name.clone() };
+    *s.pair_request.lock().unwrap() = Some((label, std::time::Instant::now()));
     if socket.send(Message::Text(json!({"t": "pair"}).to_string().into())).await.is_err() {
         return false;
     }

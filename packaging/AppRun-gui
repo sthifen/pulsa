@@ -1,0 +1,20 @@
+#!/bin/sh
+# Lanzador de la AppImage de Pulsa con ventana (x86_64).
+#  · Desde el menú o con doble clic: la ventana de Pulsa (si ya está abierto,
+#    sólo la muestra: hay una sola instancia).
+#  · --fondo: en segundo plano, sin ventana (lo usa «Iniciar con el sistema»).
+#  · Desde una terminal: el servidor sin ventana, con su registro a la vista
+#    (para la ventana: pulsa.appimage --ventana).
+HERE="$(dirname "$(readlink -f "$0")")"
+BIN="$HERE/usr/bin/pulsa"
+
+if [ "${1:-}" = "--fondo" ]; then
+  shift
+  exec "$BIN" --ventana --fondo "$@"
+fi
+if [ -t 1 ]; then
+  exec "$BIN" "$@"
+fi
+LOG="${XDG_CACHE_HOME:-$HOME/.cache}/pulsa.log"
+mkdir -p "$(dirname "$LOG")"
+exec "$BIN" --ventana "$@" >>"$LOG" 2>&1

@@ -6,7 +6,14 @@ description = "La tablet como teclado y trackpad del PC"
 license = "MIT"
 repository = "https://github.com/sthifen/pulsa"
 
+[features]
+# Ventana nativa (GTK4 + libadwaita). Sin ella, el programa es un servidor
+# estático sin dependencias del sistema (para la Raspberry o un servicio).
+gui = ["dep:gtk", "dep:adw"]
+
 [dependencies]
+gtk = { version = "0.11.5", package = "gtk4", features = ["v4_14"], optional = true }
+adw = { version = "0.9.2", package = "libadwaita", features = ["v1_5"], optional = true }
 anyhow = "1.0.104"
 axum = { version = "0.8.9", features = ["ws"] }
 clap = { version = "4.6.7", features = ["derive"] }

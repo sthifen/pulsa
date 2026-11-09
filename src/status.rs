@@ -121,19 +121,20 @@ fn config_home() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".config"))
 }
 
-fn autostart_path() -> PathBuf {
+pub fn autostart_path() -> PathBuf {
     config_home().join("autostart/pulsa.desktop")
 }
 
-fn menu_path() -> PathBuf {
+pub fn menu_path() -> PathBuf {
     let data = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".local/share"));
-    data.join("applications/pulsa.desktop")
+    // Con el id de la app: así GNOME asocia la ventana a su icono del menú.
+    data.join("applications/dev.pulsa.Pulsa.desktop")
 }
 
 /// Crea o borra un acceso directo que lanza esta misma AppImage (o binario).
-fn desktop_file(path: &PathBuf, on: bool, background: bool) -> std::io::Result<()> {
+pub fn desktop_file(path: &PathBuf, on: bool, background: bool) -> std::io::Result<()> {
     if !on {
         return match std::fs::remove_file(path) {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
@@ -144,11 +145,16 @@ fn desktop_file(path: &PathBuf, on: bool, background: bool) -> std::io::Result<(
         .map(PathBuf::from)
         .or_else(|| std::env::current_exe().ok())
         .ok_or_else(|| std::io::Error::other("no se sabe dónde está Pulsa"))?;
-    // Al iniciar sesión, en silencio; desde el menú, abre esta página.
-    let arg = if background { " --fondo" } else { "" };
+    // Al iniciar sesión, en segundo plano; desde el menú, con la ventana.
+    let gui = cfg!(feature = "gui");
+    let arg = match (background, gui) {
+        (true, true) => " --ventana --fondo",
+        (false, true) => " --ventana",
+        _ => "",
+    };
     let text = format!(
         "[Desktop Entry]\nType=Application\nName=Pulsa\nComment=La tablet como teclado y trackpad\n\
-         Exec=\"{}\"{arg}\nIcon=input-keyboard\nTerminal=false\nCategories=Utility;\nX-GNOME-Autostart-enabled=true\n",
+         Exec=\"{}\"{arg}\nIcon=dev.pulsa.Pulsa\nTerminal=false\nCategories=Utility;\nX-GNOME-Autostart-enabled=true\n",
         exe.display()
     );
     if let Some(dir) = path.parent() {

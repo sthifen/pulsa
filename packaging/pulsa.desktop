@@ -2,7 +2,7 @@
 Type=Application
 Name=Pulsa
 Comment=La tablet como teclado y trackpad
-Exec=pulsa
+Exec=pulsa --ventana
 Icon=pulsa
 Terminal=false
 Categories=Utility;
