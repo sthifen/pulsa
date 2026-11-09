@@ -1,0 +1,24 @@
+#!/bin/sh
+# Lanzador de la AppImage de Pulsa.
+#  · Doble clic: arranca Pulsa y abre su página de estado en el navegador
+#    (si ya estaba abierto, sólo abre la página).
+#  · Desde una terminal: el servidor, con su registro a la vista.
+#  · --fondo: en silencio (lo usa "Arrancar con el ordenador").
+# Pulsa se queda en primer plano: la AppImage sigue montada mientras corre.
+HERE="$(dirname "$(readlink -f "$0")")"
+BIN="$HERE/usr/bin/pulsa"
+
+if [ "${1:-}" = "--fondo" ]; then
+  shift
+  exec "$BIN" "$@"
+fi
+if [ -t 1 ]; then
+  exec "$BIN" "$@"
+fi
+
+PORT=8795
+URL="http://localhost:$PORT/estado"
+( sleep 1.5; xdg-open "$URL" >/dev/null 2>&1 || gio open "$URL" >/dev/null 2>&1 ) &
+LOG="${XDG_CACHE_HOME:-$HOME/.cache}/pulsa.log"
+mkdir -p "$(dirname "$LOG")"
+exec "$BIN" "$@" >>"$LOG" 2>&1

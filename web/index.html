@@ -151,6 +151,18 @@
   .panel .leave { margin-top: 24px; width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--pad-edge);
     background: none; color: var(--ink); font: 500 14px var(--font); }
 
+  /* Código de emparejamiento (primera vez por WiFi) */
+  #pairbox { position: fixed; inset: 0; z-index: 30; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+  #pairbox .in { text-align: center; width: min(420px, 92vw); }
+  #pairbox h2 { margin: 0 0 6px; font-size: 22px; }
+  #pairbox p { margin: 0 0 18px; color: var(--ink2); font-size: 14px; }
+  #pairbox .digits { font: 700 40px/1 ui-monospace, monospace; letter-spacing: .3em; min-height: 48px; margin-bottom: 18px; color: var(--ink); }
+  #pairbox .digits.bad { color: #e5534b; animation: shake .35s; }
+  @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  #pairbox .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  #pairbox .pad button { height: 64px; border-radius: 12px; border: 0; font: 600 24px var(--font); color: var(--ink);
+    background: linear-gradient(180deg, var(--cap-top), var(--cap)); box-shadow: 0 4px 0 var(--cap-edge); }
+  #pairbox .pad button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--cap-edge); }
   #toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px); padding: 9px 16px; border-radius: 20px;
     background: var(--bg2); color: var(--ink); font-size: 13px; opacity: 0; transition: opacity .25s, transform .25s; z-index: 20; pointer-events: none;
     box-shadow: 0 8px 24px rgba(0,0,0,.3); }
@@ -185,12 +197,21 @@
       <button data-v="full">Completo<small>100 %</small></button>
       <button data-v="sixty">Compacto<small>60 % + trackpad</small></button>
     </div>
+    <div id="bridge-opts" hidden>
+      <h3>Puente USB</h3>
+      <p>La placa ESP32-S3 enchufada al otro equipo hace de teclado y ratón USB: no hay que emparejar nada en él y funciona en la pantalla de inicio de sesión. La tablet se conecta sola a la placa más cercana.</p>
+      <p>Si la placa ya es de otra tablet, mantén pulsado su botón BOOT 3 segundos para liberarla.</p>
+    </div>
     <div id="bt-opts" hidden>
       <h3>Bluetooth</h3>
       <p>La tablet es un teclado y ratón Bluetooth: el otro equipo no necesita nada instalado. La primera vez, hazla visible y emparéjala desde el otro equipo como cualquier teclado.</p>
       <div class="seg"><button id="bt-visible">Hacer visible<small>2 minutos</small></button></div>
       <h3>Equipos emparejados</h3>
       <div class="seg" id="bt-devs"></div>
+      <h3>Emparejar desde la tablet</h3>
+      <p>Pon el otro equipo visible (en su ajuste de Bluetooth) y búscalo desde aquí. Puede que te pida confirmar una vez.</p>
+      <div class="seg"><button id="bt-scan">Buscar equipos cercanos</button></div>
+      <div class="seg" id="bt-found" style="margin-top:8px"></div>
     </div>
     <h3>Posición</h3>
     <div class="seg" id="opt-pos"></div>
@@ -243,6 +264,14 @@
   </div>
 </div>
 <div id="toast"></div>
+<div id="pairbox" hidden>
+  <div class="in">
+    <h2>Escribe el código del PC</h2>
+    <p>Sale en la terminal de Pulsa o en la página <b>localhost:8795/estado</b> del PC. Solo hace falta la primera vez.</p>
+    <div class="digits" id="pairdigits">&nbsp;</div>
+    <div class="pad" id="pairpad"></div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -266,11 +295,14 @@ let btInfo = {};
 function connect() {
   if (BT) { btPoll(); return; }
   const name = native && native.deviceName ? native.deviceName() : "tablet";
-  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws?name=" + encodeURIComponent(name));
-  ws.onopen = () => { online = true; retry = 400; setConn(); };
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws?name=" + encodeURIComponent(name)
+    + "&id=" + encodeURIComponent(clientId()));
+  ws.onopen = () => { online = true; paired = false; retry = 400; setConn(); };
   ws.onmessage = (e) => {
     let m; try { m = JSON.parse(e.data); } catch (_) { return; }
-    if (m.t === "hello") { pcName = m.name; setConn(); }
+    if (m.t === "pair") { askCode(false); }
+    else if (m.t === "badcode") { askCode(true); }
+    else if (m.t === "hello") { pcName = m.name; paired = true; document.getElementById("pairbox").hidden = true; setConn(); }
     else if (m.t === "leds") { leds.caps = m.caps; leds.num = m.num; showLeds(); }
   };
   ws.onclose = () => {
@@ -286,23 +318,83 @@ function setConn() {
 }
 function send(o) {
   if (BT) { if (online) native.bt(JSON.stringify(o)); return; }
-  if (online) ws.send(JSON.stringify(o));
+  if (online && (paired || o.t === "code")) ws.send(JSON.stringify(o));
 }
+
+// Quién es esta tablet ante el PC (para no pedir el código cada vez).
+let paired = false;
+function clientId() {
+  if (native && native.clientId) return native.clientId();
+  let id = "";
+  try { id = localStorage.getItem("pulsa-id") || ""; } catch (_) {}
+  if (!id) {
+    id = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
+    try { localStorage.setItem("pulsa-id", id); } catch (_) {}
+  }
+  return id;
+}
+let codeTyped = "";
+function askCode(bad) {
+  const box = document.getElementById("pairbox"), d = document.getElementById("pairdigits");
+  box.hidden = false;
+  codeTyped = "";
+  d.textContent = bad ? "No es ese" : "\u00a0";
+  d.classList.toggle("bad", bad);
+}
+(function buildPad() {
+  const pad = document.getElementById("pairpad");
+  for (const k of ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "✓"]) {
+    const b = document.createElement("button");
+    b.textContent = k;
+    b.onclick = () => {
+      const d = document.getElementById("pairdigits");
+      d.classList.remove("bad");
+      if (k === "⌫") codeTyped = codeTyped.slice(0, -1);
+      else if (k !== "✓" && codeTyped.length < 6) codeTyped += k;
+      d.textContent = codeTyped || "\u00a0";
+      clack("down", false, 0);
+      if (codeTyped.length === 6 || k === "✓") { send({ t: "code", c: codeTyped }); codeTyped = ""; }
+    };
+    pad.appendChild(b);
+  }
+})();
 setInterval(() => { if (!BT) send({ t: "p" }); }, 1000);
 
-const BT_TEXT = { starting: "Bluetooth: preparando…", ready: "Bluetooth: esperando a un equipo",
-  connecting: "Bluetooth: conectando…", connected: "", error: "" };
+const BRIDGE = BT && native.btMode && native.btMode() === "bridge";
+const BT_TEXT = BRIDGE
+  ? { starting: "Puente USB: preparando…", ready: "Puente USB: buscando la placa…", connecting: "Puente USB: conectando…", connected: "", error: "" }
+  : { starting: "Bluetooth: preparando…", ready: "Bluetooth: esperando a un equipo", connecting: "Bluetooth: conectando…", connected: "", error: "" };
 function btPoll() {
   let st = {};
   try { st = JSON.parse(native.btState()); } catch (_) {}
   const was = online;
   online = st.state === "connected";
   if (was && !online) releaseAll(false);
-  pcName = online ? "Bluetooth · " + (st.device || "conectado") : (st.state === "error" ? st.error : BT_TEXT[st.state] || "Bluetooth");
+  pcName = online ? (BRIDGE ? "Puente USB" : "Bluetooth · " + (st.device || "conectado")) : (st.state === "error" ? st.error : BT_TEXT[st.state] || "Bluetooth");
   if (st.caps !== leds.caps || st.num !== leds.num) { leds.caps = !!st.caps; leds.num = !!st.num; showLeds(); }
   btInfo = st;
   setConn();
   setTimeout(btPoll, 500);
+}
+let scanTimer = 0;
+function btScanPoll() {
+  let st = { scanning: false, devices: [] };
+  try { st = JSON.parse(native.btFound()); } catch (_) {}
+  const box = document.getElementById("bt-found");
+  box.textContent = "";
+  for (const d of st.devices) {
+    const b = document.createElement("button");
+    b.textContent = d.name;
+    const sm = document.createElement("small");
+    sm.textContent = d.pairing ? "emparejando… acepta en el otro equipo" : "tocar para emparejar";
+    b.appendChild(sm);
+    b.onclick = () => { native.btPair(d.address); toast("Emparejando con " + d.name + "…"); };
+    box.appendChild(b);
+  }
+  if (!st.devices.length) box.innerHTML = st.scanning ? "<p>Buscando…</p>" : "<p>No se encontró nada. ¿Está visible el otro equipo?</p>";
+  document.getElementById("bt-scan").textContent = st.scanning ? "Buscando…" : "Buscar otra vez";
+  clearTimeout(scanTimer);
+  if (sheet.classList.contains("open")) scanTimer = setTimeout(() => { btScanPoll(); btDevices(); }, 1000);
 }
 function btDevices() {
   const box = document.getElementById("bt-devs");
@@ -1030,10 +1122,13 @@ for (const el of pad.querySelectorAll(".btns div")) {
 //  Ajustes
 // ═══════════════════════════════════════════════════════════════════
 const sheet = document.getElementById("sheet");
-document.getElementById("gear").onclick = () => { releaseAll(); if (BT) btDevices(); sheet.classList.add("open"); };
-if (BT) {
+document.getElementById("gear").onclick = () => { releaseAll(); if (BT && !BRIDGE) btDevices(); sheet.classList.add("open"); };
+if (BRIDGE) {
+  document.getElementById("bridge-opts").hidden = false;
+} else if (BT) {
   document.getElementById("bt-opts").hidden = false;
   document.getElementById("bt-visible").onclick = () => native.btVisible();
+  document.getElementById("bt-scan").onclick = () => { native.btScan(); setTimeout(btScanPoll, 300); };
   // Tocar el estado de la barra abre directamente la lista de equipos.
   document.getElementById("conn").onclick = () => document.getElementById("gear").onclick();
 }

@@ -5,3 +5,4 @@ android/*.idsig
 android/debug.keystore
 android/assets/keyboard.html
 dist/
+firmware/pulsa-puente/build/

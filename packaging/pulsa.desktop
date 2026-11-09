@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Pulsa
+Comment=La tablet como teclado y trackpad
+Exec=pulsa
+Icon=pulsa
+Terminal=false
+Categories=Utility;
+Keywords=teclado;keyboard;tablet;trackpad;bluetooth;

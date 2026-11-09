@@ -37,7 +37,9 @@ public class MainActivity extends Activity {
     /** El teclado dentro de la app, para el modo Bluetooth (sin PC). */
     private static final String BT_KEYBOARD = "file:///android_asset/keyboard.html";
     private static final int REQ_BT_PERMS = 1, REQ_BT_ENABLE = 2, REQ_BT_VISIBLE = 3;
-    private BtHid bt;
+    /** Bluetooth directo o puente USB, el que esté en uso. */
+    private Link bt;
+    private boolean bridgeMode;
     private final PcFinder finder = new PcFinder();
     private WebView web;
     private Vibrator vibrator;
@@ -82,7 +84,7 @@ public class MainActivity extends Activity {
                 if (url != null && !url.startsWith("file:")) view.loadUrl(LAUNCHER + "#error");
             }
         });
-        web.addJavascriptInterface(new Bridge(), "PulsaNative");
+        web.addJavascriptInterface(new JsBridge(), "PulsaNative");
         setContentView(web);
 
         if (state != null) web.restoreState(state);
@@ -107,7 +109,7 @@ public class MainActivity extends Activity {
         getWindow().setAttributes(lp);
     }
 
-    private final class Bridge {
+    private final class JsBridge {
         private SharedPreferences prefs() {
             return getSharedPreferences("pulsa", MODE_PRIVATE);
         }
@@ -115,6 +117,17 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public String deviceName() {
             return Build.MODEL;
+        }
+
+        /** Identificador fijo de esta tablet, para que el PC la recuerde. */
+        @JavascriptInterface
+        public String clientId() {
+            String id = prefs().getString("client_id", null);
+            if (id == null) {
+                id = java.util.UUID.randomUUID().toString();
+                prefs().edit().putString("client_id", id).apply();
+            }
+            return id;
         }
 
         @JavascriptInterface
@@ -162,37 +175,78 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void openBt() {
-            runOnUiThread(MainActivity.this::startBt);
+            runOnUiThread(() -> {
+                bridgeMode = false;
+                startBt();
+            });
+        }
+
+        /** Puente USB: placa ESP32-S3 enchufada al otro equipo. */
+        @JavascriptInterface
+        public void openBridge() {
+            runOnUiThread(() -> {
+                bridgeMode = true;
+                startBt();
+            });
+        }
+
+        @JavascriptInterface
+        public String btMode() {
+            return bridgeMode ? "bridge" : "hid";
+        }
+
+        /** El puente necesita BLE (Android 5); el Bluetooth directo, Android 9. */
+        @JavascriptInterface
+        public boolean bridgeWorks() {
+            return Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
         }
 
         @JavascriptInterface
         public void bt(String json) {
-            BtHid b = bt;
+            Link b = bt;
             if (b != null) b.handle(json);
         }
 
         @JavascriptInterface
         public void btRelease() {
-            BtHid b = bt;
+            Link b = bt;
             if (b != null) b.releaseAll();
         }
 
         @JavascriptInterface
         public String btState() {
-            BtHid b = bt;
+            Link b = bt;
             return b != null ? b.state() : "{\"state\":\"starting\"}";
         }
 
         @JavascriptInterface
         public String btDevices() {
-            BtHid b = bt;
+            Link b = bt;
             return b != null ? b.devices() : "[]";
         }
 
         @JavascriptInterface
         public void btConnect(String address) {
-            BtHid b = bt;
+            Link b = bt;
             if (b != null) b.connect(address);
+        }
+
+        @JavascriptInterface
+        public void btScan() {
+            Link b = bt;
+            if (b != null) b.scan();
+        }
+
+        @JavascriptInterface
+        public String btFound() {
+            Link b = bt;
+            return b != null ? b.found() : "{\"scanning\":false,\"devices\":[]}";
+        }
+
+        @JavascriptInterface
+        public void btPair(String address) {
+            Link b = bt;
+            if (b != null) b.pair(address);
         }
 
         /** Dos minutos visible, para emparejarla desde el otro equipo. */
@@ -228,9 +282,16 @@ public class MainActivity extends Activity {
     // ── Arranque del modo Bluetooth: permisos → Bluetooth encendido → teclado ──
 
     private void startBt() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return;
+        if (Build.VERSION.SDK_INT < (bridgeMode ? Build.VERSION_CODES.LOLLIPOP : Build.VERSION_CODES.P)) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+                && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // Android 9-11: buscar equipos Bluetooth exige el permiso de ubicación.
+            requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, REQ_BT_PERMS);
+            return;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            String[] perms = {Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE};
+            String[] perms = {Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE,
+                    Manifest.permission.BLUETOOTH_SCAN};
             for (String p : perms) {
                 if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) {
                     requestPermissions(perms, REQ_BT_PERMS);
@@ -247,7 +308,8 @@ public class MainActivity extends Activity {
             startActivityForResult(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQ_BT_ENABLE);
             return;
         }
-        if (bt == null) bt = new BtHid(this);
+        stopBt();
+        bt = bridgeMode ? new dev.pulsa.Bridge(this) : new BtHid(this);
         web.loadUrl(BT_KEYBOARD);
     }
 

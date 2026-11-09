@@ -38,6 +38,11 @@
     <p>Como un teclado y ratón Bluetooth de verdad: sirve para una Raspberry, otro PC o un móvil, sin instalar nada en ellos.</p>
     <button id="bt-btn">Usar como teclado Bluetooth</button>
   </section>
+  <section id="bridge" hidden>
+    <h2>Puente USB</h2>
+    <p>Con una placa ESP32-S3 (unos 5 dólares) enchufada al otro equipo, la tablet es un teclado USB de verdad: sin emparejar nada en él. <a href="https://github.com/sthifen/pulsa/blob/master/firmware/README.md">Cómo preparar la placa</a></p>
+    <button id="bridge-btn">Usar con el puente USB</button>
+  </section>
   <section id="usb">
     <h2>Por cable USB</h2>
     <p id="usb-state"><span class="dot"></span>Buscando PC…</p>
@@ -150,6 +155,10 @@ $("wifi-btn").onclick = function () {
   });
 };
 
+if (bridge.bridgeWorks()) {
+  $("bridge").hidden = false;
+  $("bridge-btn").onclick = function () { connecting = true; bridge.openBridge(); };
+}
 if (bridge.btWorks()) {
   $("bt").hidden = false;
   $("bt-btn").onclick = function () { connecting = true; bridge.openBt(); };

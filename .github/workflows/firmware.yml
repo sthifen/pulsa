@@ -1,0 +1,41 @@
+# Compila el programa del puente USB (ESP32-S3) y, al publicar una versión,
+# sube pulsa-puente-esp32s3.bin a ella, listo para grabar desde el navegador.
+name: Firmware del puente
+
+on:
+  push:
+    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Núcleo ESP32 para Arduino
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@3.0.7
+      - name: Compilar
+        run: |
+          arduino-cli compile --warnings default \
+            --fqbn esp32:esp32:esp32s3:USBMode=default,CDCOnBoot=default \
+            --export-binaries firmware/pulsa-puente
+          cp "$(find firmware/pulsa-puente/build -name '*.merged.bin' | head -1)" pulsa-puente-esp32s3.bin
+          ls -l pulsa-puente-esp32s3.bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pulsa-puente-esp32s3
+          path: pulsa-puente-esp32s3.bin
+      - name: Subir a la versión
+        if: github.event_name == 'release'
+        run: gh release upload "${{ github.event.release.tag_name }}" pulsa-puente-esp32s3.bin --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulsa</title>
+<style>
+  :root { --bg: #15171c; --card: #1d2027; --edge: #2c3039; --ink: #e8eaef; --ink2: #8e95a3; --accent: #ff7a45; --ok: #3fb950; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f2efe9; --card: #fff; --edge: #e2ddd4; --ink: #22252b; --ink2: #6b717d; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 Inter, Roboto, system-ui, sans-serif; padding: 32px 16px; }
+  main { max-width: 860px; margin: 0 auto; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+  header svg { width: 52px; height: 52px; flex: none; }
+  h1 { margin: 0; font-size: 26px; }
+  header p { margin: 0; color: var(--ink2); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); margin-right: 6px; vertical-align: 1px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  section { background: var(--card); border: 1px solid var(--edge); border-radius: 16px; padding: 20px; }
+  h2 { margin: 0 0 6px; font-size: 16px; }
+  section > p { margin: 0 0 12px; color: var(--ink2); font-size: 14px; }
+  .qr { display: block; width: 180px; height: 180px; border-radius: 12px; background: #fff; padding: 6px; margin: 6px 0 10px; }
+  a { color: var(--accent); }
+  .code { font: 700 38px/1 ui-monospace, "JetBrains Mono", monospace; letter-spacing: .18em; margin: 8px 0 4px; }
+  code { background: var(--bg); border: 1px solid var(--edge); padding: 2px 7px; border-radius: 6px; font-size: 14px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--edge); font-size: 14px; }
+  li:first-child { border-top: 0; }
+  .muted { color: var(--ink2); font-size: 14px; }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-top: 1px solid var(--edge); }
+  .row:first-of-type { border-top: 0; }
+  .row small { display: block; color: var(--ink2); font-size: 12px; }
+  .sw { width: 46px; height: 28px; border-radius: 14px; background: var(--edge); position: relative; border: 0; cursor: pointer; flex: none; transition: background .2s; }
+  .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .sw.on { background: var(--accent); }
+  .sw.on::after { transform: translateX(18px); }
+  button.link { background: none; border: 0; color: var(--ink2); cursor: pointer; font: inherit; font-size: 13px; }
+  button.link:hover { color: #e5534b; }
+  .quit { margin-top: 18px; padding: 10px 18px; border-radius: 10px; border: 1px solid var(--edge); background: none; color: var(--ink); font: 500 14px inherit; cursor: pointer; }
+  .quit:hover { border-color: #e5534b; color: #e5534b; }
+  .err { color: #e5534b; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg viewBox="0 0 108 108" aria-hidden="true"><rect width="108" height="108" rx="24" fill="#15171C"/><rect x="18" y="40" width="72" height="38" rx="6" fill="#1A1D23"/><rect x="22" y="30" width="64" height="36" rx="6" fill="#3A3F4A"/><rect x="48" y="74" width="12" height="6" fill="#FF7A45"/><rect x="42" y="44" width="24" height="4" fill="#FF7A45"/></svg>
+    <div><h1>Pulsa</h1><p id="status">Cargando…</p></div>
+  </header>
+
+  <div class="grid">
+    <section>
+      <h2>1. La app en la tablet</h2>
+      <p>Escanea con la tablet para descargarla.</p>
+      <img class="qr" src="/estado/qr.svg" alt="Código QR para descargar la app">
+      <a id="apk" href="#">Descargar pulsa.apk</a>
+    </section>
+
+    <section>
+      <h2>2. Conectar</h2>
+      <p><b>Por cable:</b> enchufa la tablet con la depuración USB activada y se conecta sola.</p>
+      <p><b>Por WiFi:</b> en la app aparece <b id="pcname"></b>; tócalo y escribe este código la primera vez:</p>
+      <div class="code" id="code">······</div>
+      <p class="muted" id="wifi"></p>
+    </section>
+
+    <section>
+      <h2>Tablets</h2>
+      <p>Conectadas ahora</p>
+      <ul id="online"></ul>
+      <p style="margin-top:14px">Emparejadas por WiFi</p>
+      <ul id="paired"></ul>
+    </section>
+
+    <section>
+      <h2>Opciones</h2>
+      <div class="row"><div>Arrancar con el ordenador<small>Pulsa se abre en segundo plano al iniciar sesión</small></div><button class="sw" id="autostart"></button></div>
+      <div class="row"><div>En el menú de aplicaciones<small>Para abrir esta página cuando quieras</small></div><button class="sw" id="menu"></button></div>
+      <button class="quit" id="quit">Cerrar Pulsa</button>
+      <p class="err" id="err"></p>
+    </section>
+  </div>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const H = { "X-Pulsa": "1" };
+function li(text, extra) {
+  const el = document.createElement("li");
+  el.textContent = text;
+  if (extra) el.appendChild(extra);
+  return el;
+}
+function list(box, items, empty) {
+  box.textContent = "";
+  if (!items.length) { const e = li(empty); e.className = "muted"; box.appendChild(e); return; }
+  items.forEach((x) => box.appendChild(x));
+}
+async function act(what, extra = "") {
+  const r = await fetch("/estado/accion?what=" + what + extra, { method: "POST", headers: H });
+  $("err").textContent = r.ok ? "" : "No se pudo: " + await r.text();
+  refresh();
+}
+async function refresh() {
+  let s;
+  try { s = await (await fetch("/estado/info", { headers: H })).json(); }
+  catch (_) { $("status").innerHTML = '<span class="err">Pulsa no está en marcha.</span>'; return; }
+  $("status").innerHTML = '<span class="dot"></span>En marcha en <b></b> · v' + s.version;
+  $("status").querySelector("b").textContent = s.name;
+  $("pcname").textContent = s.name;
+  $("code").textContent = s.code;
+  $("wifi").textContent = s.wifi.length ? "O escribe la dirección: " + s.wifi.join(" · ") : "Este PC no está en ninguna WiFi.";
+  $("apk").href = s.apk;
+  list($("online"), s.online.map((t) => li(t)), "Ninguna");
+  list($("paired"), s.paired.map((t) => {
+    const b = document.createElement("button");
+    b.className = "link"; b.textContent = "Olvidar";
+    b.onclick = () => act("forget", "&id=" + encodeURIComponent(t.id));
+    return li(t.name || t.id, b);
+  }), "Ninguna");
+  for (const k of ["autostart", "menu"]) {
+    $(k).classList.toggle("on", s[k]);
+    $(k).onclick = () => act(k, "&on=" + !s[k]);
+  }
+}
+$("quit").onclick = async () => {
+  await fetch("/estado/accion?what=quit", { method: "POST", headers: H });
+  $("status").textContent = "Pulsa se cerró. Puedes cerrar esta pestaña.";
+};
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>

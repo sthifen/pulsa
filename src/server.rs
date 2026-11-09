@@ -8,15 +8,20 @@
 //! * `{"t":"m","x":1.5,"y":-2}`: movimiento relativo del puntero, en píxeles.
 //! * `{"t":"s","x":0,"y":120}`: desplazamiento (120 = una muesca; `y` > 0 sube).
 //! * `{"t":"p"}`: sigo aquí (cada segundo).
+//! * `{"t":"code","c":"123456"}`: código de emparejamiento (sólo por WiFi,
+//!   la primera vez; ver `pairing.rs`).
 //!
-//! Al PC le llegan: `{"t":"hello",…}` al conectar y `{"t":"leds",…}` cuando
-//! cambia Bloq Mayús o Bloq Num.
+//! A la tablet le llegan: `{"t":"pair"}` si tiene que escribir el código,
+//! `{"t":"badcode"}` si no era, `{"t":"hello",…}` cuando ya puede escribir y
+//! `{"t":"leds",…}` cuando cambia Bloq Mayús o Bloq Num.
 //!
 //! Una tecla que se queda pulsada se repite sin fin, así que lo pulsado se
 //! suelta si la tablet se desconecta o deja de dar señales (la WiFi puede
 //! caerse sin cerrar la conexión).
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -26,7 +31,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{ConnectInfo, Query, State};
 use axum::http::header;
 use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::routing::{get, post};
 use serde::Deserialize;
 use serde_json::json;
 use tokio::sync::watch;
@@ -43,7 +48,13 @@ const QUIET_CLOSE: Duration = Duration::from_secs(15);
 pub struct AppState {
     pub injector: Injector,
     pub leds: watch::Receiver<Leds>,
+    pub pairing: crate::pairing::Pairing,
+    pub port: u16,
+    /// Tablets conectadas ahora mismo, para la página de estado.
+    pub online: Mutex<BTreeMap<u64, String>>,
 }
+
+static NEXT_SESSION: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Deserialize)]
 #[serde(tag = "t")]
@@ -63,6 +74,8 @@ enum ClientMsg {
     },
     #[serde(rename = "p")]
     Ping,
+    #[serde(rename = "code")]
+    Code { c: String },
 }
 
 pub async fn serve(state: Arc<AppState>, listener: tokio::net::TcpListener) -> anyhow::Result<()> {
@@ -70,6 +83,10 @@ pub async fn serve(state: Arc<AppState>, listener: tokio::net::TcpListener) -> a
         .route("/", get(index))
         .route("/info", get(info))
         .route("/ws", get(ws))
+        .route("/estado", get(crate::status::page))
+        .route("/estado/qr.svg", get(crate::status::qr))
+        .route("/estado/info", get(crate::status::info))
+        .route("/estado/accion", post(crate::status::action))
         .with_state(state);
     // Sin Nagle: cada tecla es un paquete pequeño que TCP retendría
     // esperando juntar más.
@@ -105,6 +122,9 @@ async fn info(State(s): State<Arc<AppState>>) -> impl IntoResponse {
 struct WsParams {
     #[serde(default)]
     name: String,
+    /// Identificador fijo de la tablet (lo genera la app o la página).
+    #[serde(default)]
+    id: String,
 }
 
 async fn ws(
@@ -114,7 +134,15 @@ async fn ws(
     Query(params): Query<WsParams>,
 ) -> impl IntoResponse {
     let who = if params.name.is_empty() { peer.to_string() } else { format!("{} ({peer})", params.name) };
-    ws.on_upgrade(move |socket| session(socket, s, who))
+    let trusted = s.pairing.trusted(peer.ip(), &params.id);
+    ws.on_upgrade(move |socket| async move {
+        let id = NEXT_SESSION.fetch_add(1, Ordering::Relaxed);
+        let label = if params.name.is_empty() { peer.ip().to_string() } else { params.name.clone() };
+        let via = if peer.ip().is_loopback() { "USB" } else { "WiFi" };
+        s.online.lock().unwrap().insert(id, format!("{label} · {via}"));
+        session(socket, s.clone(), who, trusted, params).await;
+        s.online.lock().unwrap().remove(&id);
+    })
 }
 
 /// Lo que esta tablet tiene pulsado ahora mismo.
@@ -135,8 +163,38 @@ impl Held {
     }
 }
 
-async fn session(mut socket: WebSocket, s: Arc<AppState>, who: String) {
+/// Una tablet nueva por WiFi: hasta que escriba el código no hace nada más.
+/// `false` si se fue antes.
+async fn pair(socket: &mut WebSocket, s: &AppState, who: &str, params: &WsParams) -> bool {
+    tracing::info!("{who} quiere emparejarse por WiFi: código {}", s.pairing.code());
+    if socket.send(Message::Text(json!({"t": "pair"}).to_string().into())).await.is_err() {
+        return false;
+    }
+    loop {
+        let msg = match tokio::time::timeout(Duration::from_secs(300), socket.recv()).await {
+            Ok(Some(Ok(Message::Text(t)))) => t,
+            Ok(Some(Ok(_))) => continue,
+            _ => return false,
+        };
+        if let Ok(ClientMsg::Code { c }) = serde_json::from_str::<ClientMsg>(&msg) {
+            if s.pairing.try_code(&params.id, &params.name, &c) {
+                tracing::info!("{who} emparejada");
+                return true;
+            }
+            tracing::warn!("{who}: código equivocado");
+            if socket.send(Message::Text(json!({"t": "badcode"}).to_string().into())).await.is_err() {
+                return false;
+            }
+        }
+    }
+}
+
+async fn session(mut socket: WebSocket, s: Arc<AppState>, who: String, trusted: bool, params: WsParams) {
     tracing::info!("conectada: {who}");
+    if !trusted && !pair(&mut socket, &s, &who, &params).await {
+        tracing::info!("desconectada sin emparejar: {who}");
+        return;
+    }
     let hello = json!({ "t": "hello", "name": crate::lan::hostname(), "via": s.injector.name() });
     let mut leds = s.leds.clone();
     let mut sent_leds = *leds.borrow_and_update();
@@ -220,7 +278,7 @@ async fn apply(inj: &Injector, held: &mut Held, m: ClientMsg) -> anyhow::Result<
             }
         }
         ClientMsg::Scroll { x, y } => inj.scroll(x.clamp(-2400, 2400), y.clamp(-2400, 2400)).await?,
-        ClientMsg::Ping => {}
+        ClientMsg::Ping | ClientMsg::Code { .. } => {}
     }
     Ok(())
 }

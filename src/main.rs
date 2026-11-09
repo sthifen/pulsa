@@ -8,7 +8,9 @@
 mod adb;
 mod inject;
 mod lan;
+mod pairing;
 mod server;
+mod status;
 
 use std::net::{IpAddr, SocketAddr};
 
@@ -32,6 +34,10 @@ struct Args {
     /// No configurar `adb reverse` para las tablets conectadas por USB.
     #[arg(long, visible_alias = "sin-usb")]
     no_usb: bool,
+
+    /// Arrancar en silencio (lo usa el arranque automático de la AppImage).
+    #[arg(long, hide = true)]
+    fondo: bool,
 }
 
 #[tokio::main]
@@ -43,6 +49,7 @@ async fn main() -> Result<()> {
         .with_target(false)
         .init();
     let args = Args::parse();
+    let _ = args.fondo; // sólo cambia el lanzador de la AppImage
 
     let (leds_tx, leds) = watch::channel(Default::default());
     let injector = inject::Injector::create(leds_tx).await?;
@@ -55,11 +62,19 @@ async fn main() -> Result<()> {
     for ip in lan::addresses() {
         tracing::info!("  por WiFi: http://{ip}:{}", args.port);
     }
+    tracing::info!("  estado y QR de la app: http://localhost:{}/estado", args.port);
     if !args.no_usb {
         tokio::spawn(adb::watch(args.port));
     }
 
-    let state = std::sync::Arc::new(server::AppState { injector, leds });
+    let state = std::sync::Arc::new(server::AppState {
+        injector,
+        leds,
+        pairing: pairing::Pairing::load(),
+        port: args.port,
+        online: Default::default(),
+    });
+    tracing::info!("  código para emparejar tablets por WiFi: {}", state.pairing.code());
     let result = tokio::select! {
         r = server::serve(state.clone(), listener) => r,
         _ = tokio::signal::ctrl_c() => { tracing::info!("cerrando"); Ok(()) }
