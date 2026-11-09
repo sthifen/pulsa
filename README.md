@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/sthifen/pulsa/releases/latest/download/pulsa.apk"><img src="https://img.shields.io/badge/Android-descargar%20APK-3DDC84?logo=android&logoColor=white" alt="Descargar para Android" /></a>
-  <a href="#instalar-en-el-pc"><img src="https://img.shields.io/badge/Linux-una%20l%C3%ADnea-FF7A45?logo=linux&logoColor=white" alt="Instalar en Linux" /></a>
+  <a href="https://github.com/sthifen/pulsa/releases/latest/download/Pulsa-x86_64.AppImage"><img src="https://img.shields.io/badge/Linux-AppImage-FF7A45?logo=linux&logoColor=white" alt="Descargar AppImage" /></a>
   <a href="https://github.com/sthifen/pulsa/releases/latest"><img src="https://img.shields.io/github/v/release/sthifen/pulsa?label=versi%C3%B3n&color=ff7a45" alt="Última versión" /></a>
   <a href="https://github.com/sthifen/pulsa/releases"><img src="https://img.shields.io/github/downloads/sthifen/pulsa/total?label=descargas&color=1d2027" alt="Descargas" /></a>
 </p>
@@ -33,7 +33,10 @@ falla una tecla o simplemente porque escribir con «clac clac» se siente bien.
 - ✋ **Hecho para apoyar la mano**: el teclado se pega al borde de abajo e ignora la palma apoyada.
 - 📳 Vibración en cada pulsación, teclas que se hunden y brillan, y las luces de Bloq Mayús y Bloq Num del PC en la tablet.
 - 🔵 **Bluetooth de verdad**: la tablet se anuncia como teclado y ratón Bluetooth. El otro equipo la empareja como
-  cualquier teclado, sin programas ni drivers.
+  cualquier teclado, sin programas ni drivers, y se puede emparejar empezando desde la tablet.
+- 🔌 **Puente USB** para quien no tiene *nada*: una placa ESP32-S3 de unos 5 dólares enchufada al equipo hace de
+  teclado USB de verdad, sin emparejar nada en él ([guía](firmware/README.md)).
+- 🔒 Por WiFi, cada tablet nueva necesita un código de 6 dígitos: nadie en tu red puede escribir en tu PC.
 - 🇪🇸 Ñ, tildes y AltGr: se mandan teclas físicas, así que escribe con la distribución que tengas en el PC.
 - 🪶 La app pesa **45 KB** y el programa del PC es un solo archivo sin dependencias.
 
@@ -46,6 +49,7 @@ falla una tecla o simplemente porque escribir con «clac clac» se siente bien.
 | | Qué necesita el otro equipo | Ideal para |
 |---|---|---|
 | **Bluetooth** | Nada. Lo empareja como un teclado más | Raspberry Pi, otro PC, móviles… (es un teclado Bluetooth estándar; probado con Linux) |
+| **Puente USB** | Nada: una placa ESP32-S3 en su USB | Un equipo sin teclado ni ratón; pantallas de inicio de sesión ([guía](firmware/README.md)) |
 | **Cable USB** | Pulsa + `adb` | Tu PC con Linux, sin retraso |
 | **WiFi** | Pulsa | Tu PC con Linux, sin cables |
 
@@ -64,9 +68,19 @@ falla una tecla o simplemente porque escribir con «clac clac» se siente bien.
    ```
 4. La próxima vez se conecta sola al abrir el modo Bluetooth.
 
+También puedes empezar desde la tablet: ⚙ → **Buscar equipos cercanos** (con el otro equipo visible) y tocar su
+nombre; el otro equipo sólo tiene que confirmar.
+
 ### Instalar en el PC
 
-Para el modo USB/WiFi, en Linux (x86_64 o ARM64):
+Para el modo USB/WiFi, en Linux (x86_64 o ARM64).
+
+**AppImage** (lo más fácil): descarga [`Pulsa-x86_64.AppImage`](https://github.com/sthifen/pulsa/releases/latest/download/Pulsa-x86_64.AppImage)
+(o [`Pulsa-aarch64.AppImage`](https://github.com/sthifen/pulsa/releases/latest/download/Pulsa-aarch64.AppImage)
+para Raspberry Pi), dale permiso de ejecución y ábrela con doble clic. Se abre una página en el navegador con el
+QR de la app, el código para la WiFi y los botones para arrancar con el ordenador o añadirlo al menú.
+
+**En una línea** (se instala como servicio y arranca con la sesión):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/sthifen/pulsa/master/packaging/install.sh | sh
@@ -74,7 +88,8 @@ curl -fsSL https://raw.githubusercontent.com/sthifen/pulsa/master/packaging/inst
 
 Descarga un único archivo a `~/.local/bin/pulsa`, lo deja arrancando solo con la sesión y da permiso al teclado
 virtual (`/dev/uinput`, pide la contraseña una vez). Luego abre la app en la tablet: si está por cable se conecta
-sola y, si está en la misma WiFi, aparece el nombre del PC para tocarlo.
+sola y, si está en la misma WiFi, aparece el nombre del PC para tocarlo. La primera vez por WiFi pide el código que
+muestra <http://localhost:8795/estado>.
 
 <details>
 <summary>Otras formas de instalarlo</summary>
