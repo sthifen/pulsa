@@ -4,61 +4,131 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pulsa</title>
+<!-- Lanzador, propuesta C: arriba lo que se detecta solo, con un único botón;
+     debajo, los demás caminos. ES5 para los WebView antiguos. -->
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { margin: 0; min-height: 100vh; background: #15171c; color: #e8eaef; padding: 16px;
-    font: 15px/1.45 Roboto, system-ui, sans-serif; display: flex; align-items: center; justify-content: center; }
-  main { width: 100%; max-width: 560px; }
-  h1 { margin: 0 0 16px; font-size: 24px; font-weight: 700; }
-  h1 small { display: block; color: #8e95a3; font-weight: 400; font-size: 14px; margin-top: 2px; }
-  section { background: #1d2027; border: 1px solid #2c3039; border-radius: 16px; padding: 16px; margin-bottom: 14px; }
-  h2 { margin: 0 0 10px; font-size: 15px; }
-  p { margin: 0 0 10px; color: #8e95a3; font-size: 13px; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #8e95a3; margin-right: 6px; }
-  .dot.ok { background: #3fb950; }
-  input, button { font: inherit; border-radius: 10px; border: 1px solid #2c3039; padding: 10px 12px; }
-  input[type=text] { background: #15171c; color: #e8eaef; min-width: 0; flex: 1; margin-right: 8px; }
-  button { background: #ff7a45; color: #1b0f08; border: 0; font-weight: 600; box-shadow: 0 3px 0 #b54f25; transition: transform .08s, box-shadow .08s; }
-  button:active { transform: translateY(3px); box-shadow: 0 0 0 #b54f25; }
-  button:disabled { opacity: .4; }
-  button.quiet { background: none; color: #ff9666; padding: 4px 0; font-weight: 400; box-shadow: none; }
-  .row { display: flex; }
-  .pc { display: block; width: 100%; text-align: left; margin-bottom: 10px; }
-  .pc small { display: block; font-weight: 400; opacity: .75; }
-  #msg { color: #f0883e; font-size: 13px; min-height: 1em; margin-bottom: 8px; }
+  html, body { margin: 0; min-height: 100%; }
+  body { background: #15171c; color: #e8eaef; font: 15px/1.45 Roboto, system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 24px 16px; min-height: 100vh; }
+  main { width: 100%; max-width: 980px; }
+  .brand { font-size: 26px; font-weight: 700; margin: 0 0 16px; letter-spacing: -.01em; }
   a { color: #ff9666; }
   [hidden] { display: none !important; }
+
+  .hero { display: flex; align-items: center; gap: 28px; background: #1d2027; border: 1px solid #2c3039;
+    border-radius: 22px; padding: 26px 30px; margin-bottom: 22px; }
+  .hero .txt { flex: 1.2; min-width: 0; }
+  .hero .art { flex: 1; min-width: 0; }
+  .hero h1 { margin: 6px 0 6px; font-size: 30px; line-height: 1.1; }
+  .hero p { margin: 0 0 18px; color: #8e95a3; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #3fb950; font-weight: 500; }
+  .pill i { width: 9px; height: 9px; border-radius: 50%; background: #3fb950; box-shadow: 0 0 8px #3fb950; }
+  .pill.wait { color: #8e95a3; }
+  .pill.wait i { background: #8e95a3; box-shadow: none; animation: blink 1.4s infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+
+  button { font: inherit; border: 0; cursor: pointer; }
+  .go { background: #ff7a45; color: #1b0f08; font-weight: 700; font-size: 18px; border-radius: 12px;
+    padding: 14px 26px; box-shadow: 0 4px 0 #b54f25; transition: transform .08s, box-shadow .08s; }
+  .go:active { transform: translateY(4px); box-shadow: 0 0 0 #b54f25; }
+
+  .lbl { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: #8e95a3; font-weight: 600; margin: 0 0 10px; }
+  .alts { display: flex; flex-wrap: wrap; gap: 12px; }
+  .alt { flex: 1 1 200px; display: flex; align-items: center; gap: 14px; text-align: left; color: #e8eaef;
+    background: transparent; border: 1px solid #2c3039; border-radius: 16px; padding: 14px 16px; transition: background .15s, border-color .15s; }
+  .alt:active, .alt.open { background: #1d2027; border-color: #ff7a45; }
+  .alt svg { width: 64px; flex: none; }
+  .alt b { display: block; font-size: 16px; }
+  .alt small { display: block; color: #8e95a3; font-size: 13px; }
+
+  .panel { margin-top: 14px; background: #1d2027; border: 1px solid #2c3039; border-radius: 16px; padding: 16px; }
+  .panel p { margin: 0 0 10px; color: #8e95a3; font-size: 13px; }
+  .pc { display: block; width: 100%; text-align: left; margin-bottom: 8px; background: #15171c; color: #e8eaef;
+    border: 1px solid #2c3039; border-radius: 12px; padding: 12px 14px; font-weight: 600; }
+  .pc small { display: block; font-weight: 400; color: #8e95a3; }
+  .row { display: flex; gap: 8px; }
+  input[type=text] { flex: 1; min-width: 0; font: inherit; background: #15171c; color: #e8eaef; border: 1px solid #2c3039; border-radius: 10px; padding: 10px 12px; }
+  .small { background: #ff7a45; color: #1b0f08; font-weight: 600; border-radius: 10px; padding: 10px 16px; }
+  .quiet { background: none; color: #ff9666; padding: 4px 0; }
+  #msg { color: #f0883e; font-size: 14px; min-height: 1.2em; margin: 14px 0 0; }
+
+  svg .s { fill: none; stroke: #c9cdd6; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  svg .a { fill: none; stroke: #ff7a45; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+  svg .fa { fill: #ff7a45; }
+  svg .dim { opacity: .4; }
+
+  @media (max-width: 640px) {
+    .hero { flex-direction: column; align-items: stretch; padding: 22px; }
+    .hero .art { order: -1; max-width: 320px; }
+    .hero h1 { font-size: 24px; }
+  }
 </style>
 </head>
 <body>
+<!-- Dibujos: tablet, PC, placa, ondas, cable, WiFi. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="tab"><rect fill="none" stroke="#c9cdd6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" x="2" y="10" width="44" height="30" rx="4"/><path fill="none" stroke="#c9cdd6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M8 22h32M8 28h32M12 34h24"/></g>
+    <g id="pc"><rect fill="none" stroke="#c9cdd6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" x="2" y="4" width="40" height="27" rx="3"/><path fill="none" stroke="#c9cdd6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M16 38h12M22 31v7"/></g>
+    <g id="chip"><rect fill="none" stroke="#ff7a45" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" x="2" y="2" width="20" height="12" rx="2.5"/><path fill="none" stroke="#ff7a45" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M22 8h6"/></g>
+    <g id="waves"><path fill="none" stroke="#ff7a45" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M2 10c4-6 4 6 8 0s4 6 8 0 4 6 8 0"/></g>
+    <g id="wifi"><path fill="none" stroke="#ff7a45" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M2 9a16 16 0 0 1 22 0M6 13a10 10 0 0 1 14 0"/><circle fill="#ff7a45" cx="13" cy="17" r="2"/></g>
+    <g id="cable"><path fill="none" stroke="#ff7a45" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M0 8h30"/></g>
+    <g id="none"><path fill="none" stroke="#ff7a45" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity=".4" d="M2 8h8M16 8h8M22 8h8" stroke-dasharray="2 5"/></g>
+  </defs>
+</svg>
+
 <main>
-  <h1>Pulsa<small>Tu tablet como teclado. Elige con qué conectarla.</small></h1>
-  <div id="msg"></div>
-  <section id="bt" hidden>
-    <h2>Por Bluetooth</h2>
-    <p>Como un teclado y ratón Bluetooth de verdad: sirve para una Raspberry, otro PC o un móvil, sin instalar nada en ellos.</p>
-    <button id="bt-btn">Usar como teclado Bluetooth</button>
-  </section>
-  <section id="bridge" hidden>
-    <h2>Puente USB</h2>
-    <p>Con una placa ESP32-S3 (unos 5 dólares) enchufada al otro equipo, la tablet es un teclado USB de verdad: sin emparejar nada en él. <a href="https://github.com/sthifen/pulsa/blob/master/firmware/README.md">Cómo preparar la placa</a></p>
-    <button id="bridge-btn">Usar con el puente USB</button>
-  </section>
-  <section id="usb">
-    <h2>Por cable USB</h2>
-    <p id="usb-state"><span class="dot"></span>Buscando PC…</p>
-    <button id="usb-btn" disabled>Conectar por USB</button>
-  </section>
-  <section>
-    <h2>En tu WiFi</h2>
-    <div id="pcs"></div>
-    <p id="scan-state"><span class="dot"></span>Buscando tu PC…</p>
-    <button id="more" class="quiet">¿No aparece? Escribir la dirección</button>
-    <div id="manual" hidden>
-      <p>Es la dirección que muestra Pulsa en el PC.</p>
-      <div class="row"><input id="host" type="text" placeholder="192.168.1.50" autocomplete="off" autocapitalize="off" spellcheck="false"><button id="wifi-btn">Conectar</button></div>
+  <div class="brand">Pulsa</div>
+
+  <section class="hero">
+    <div class="txt">
+      <span class="pill wait" id="hero-pill"><i></i><span id="hero-state">Buscando…</span></span>
+      <h1 id="hero-title">Buscando tu equipo…</h1>
+      <p id="hero-text">Un momento: miro si la tablet está enchufada a un PC con Pulsa o si hay uno en tu WiFi.</p>
+      <button class="go" id="hero-go" hidden>Empezar a escribir</button>
+    </div>
+    <div class="art">
+      <svg viewBox="0 0 150 52" id="hero-art"><use href="#tab" x="2" y="2"/><use href="#none" x="58" y="18" id="hero-link"/><use href="#pc" x="104" y="6"/></svg>
     </div>
   </section>
+
+  <p class="lbl" id="alts-label">O conecta de otra forma</p>
+  <div class="alts">
+    <button class="alt" id="alt-bt" hidden>
+      <svg viewBox="0 0 30 22"><use href="#waves" x="2" y="2"/></svg>
+      <span><b>Bluetooth</b><small>Cualquier equipo, sin instalar nada</small></span>
+    </button>
+    <button class="alt" id="alt-bridge" hidden>
+      <svg viewBox="0 0 30 22"><use href="#chip" x="0" y="3"/></svg>
+      <span><b>Puente USB</b><small>Para un equipo sin teclado ni ratón</small></span>
+    </button>
+    <button class="alt" id="alt-usb">
+      <svg viewBox="0 0 30 22"><use href="#cable" x="0" y="3"/></svg>
+      <span><b>Cable USB</b><small id="usb-state">Tu PC con Pulsa · no detectado</small></span>
+    </button>
+    <button class="alt" id="alt-wifi">
+      <svg viewBox="0 0 30 22"><use href="#wifi" x="2" y="0"/></svg>
+      <span><b>WiFi</b><small id="wifi-state">Tu PC con Pulsa · buscando…</small></span>
+    </button>
+  </div>
+
+  <div class="panel" id="wifi-panel" hidden>
+    <div id="pcs"></div>
+    <p id="scan-state">Buscando PCs con Pulsa en tu WiFi…</p>
+    <div class="row"><input id="host" type="text" placeholder="O escribe la dirección: 192.168.1.50" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="small" id="wifi-btn">Conectar</button></div>
+  </div>
+  <div class="panel" id="usb-panel" hidden>
+    <p>Enchufa la tablet al PC con un cable, activa la <b>depuración USB</b> en la tablet y abre Pulsa en el PC. Se conecta solo.</p>
+    <p>¿Aún no tienes Pulsa en el PC? <a href="https://github.com/sthifen/pulsa#instalar-en-el-pc">Cómo instalarlo</a></p>
+  </div>
+  <div class="panel" id="bridge-panel" hidden>
+    <p>Una placa ESP32-S3 (unos 5 dólares) enchufada al otro equipo hace de teclado USB de verdad: no hay que emparejar nada en él. <a href="https://github.com/sthifen/pulsa/blob/master/firmware/README.md">Cómo preparar la placa</a></p>
+    <button class="small" id="bridge-btn">Conectar con el puente</button>
+  </div>
+
+  <p id="msg"></p>
 </main>
 <script>
 "use strict";
@@ -68,14 +138,69 @@ function get(k, d) { try { var v = localStorage.getItem(k); return v === null ? 
 function set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
 window.onhashchange = function () { location.reload(); };
 
-// Al volver con "atrás" o "Desconectar" no se reconecta solo; tras un error sí.
-var auto = location.hash === "" || location.hash === "#error";
-var BT_MSG = { "#bt-denied": "Sin permiso de Bluetooth no puede hacer de teclado. Dáselo en Ajustes → Apps → Pulsa.",
-  "#bt-off": "Hace falta encender el Bluetooth.", "#bt-none": "Esta tablet no tiene Bluetooth." };
-if (BT_MSG[location.hash]) document.getElementById("msg").textContent = BT_MSG[location.hash];
-if (location.hash === "#error") $("msg").textContent = "Se perdió la conexión con el PC. Reintentando…";
 var bridge = window.PulsaNative, connecting = false;
+// Al abrir la app (sin "#") o tras perder la conexión, el cable entra solo;
+// al volver con "atrás" no, para dejar elegir.
+var auto = location.hash === "" || location.hash === "#error";
+var BT_MSG = { "#error": "Se perdió la conexión con el PC. Reintentando…",
+  "#bt-denied": "Sin permiso de Bluetooth no puede hacer de teclado. Dáselo en Ajustes → Apps → Pulsa.",
+  "#bt-off": "Hace falta encender el Bluetooth.", "#bt-none": "Esta tablet no tiene Bluetooth." };
+if (BT_MSG[location.hash]) $("msg").textContent = BT_MSG[location.hash];
 
+var canBt = bridge.btWorks(), canBridge = bridge.bridgeWorks(), canUsb = bridge.usbWorks();
+$("alt-bt").hidden = !canBt;
+$("alt-bridge").hidden = !canBridge;
+$("alt-usb").hidden = !canUsb;
+
+// ── Caminos ───────────────────────────────────────────────────────────
+function goPc(host, port) { connecting = true; set("last_mode", "pc"); location.href = "http://" + host + ":" + port + "/"; }
+function goBt() { connecting = true; set("last_mode", "bt"); bridge.openBt(); }
+function goBridge() { connecting = true; set("last_mode", "bridge"); bridge.openBridge(); }
+
+// ── Lo de arriba: lo mejor que hay ahora mismo ────────────────────────
+// Prioridad: PC por cable > el PC de siempre por WiFi > el último modo sin PC.
+var usbInfo = null, wifiPc = null, scanned = false;
+var LINKS = { usb: "#cable", wifi: "#wifi", bt: "#waves", bridge: "#chip", none: "#none" };
+function hero() {
+  var kind, title, text, state, action, ok = true;
+  var last = get("last_mode", "");
+  if (usbInfo) {
+    kind = "usb"; state = "Detectado ahora"; title = usbInfo.name + ", por cable";
+    text = "La tablet está enchufada a un PC con Pulsa."; action = function () { bridge.rememberPc(""); goPc("localhost", PORT); };
+  } else if (wifiPc) {
+    kind = "wifi"; state = "En tu WiFi"; title = wifiPc.name + ", por WiFi";
+    text = "Es el PC con el que te conectaste la última vez."; action = function () { goPc(wifiPc.host, wifiPc.port); };
+  } else if (last === "bt" && canBt) {
+    kind = "bt"; state = "La última vez"; title = "Teclado Bluetooth";
+    text = "Se vuelve a conectar solo con el último equipo."; action = goBt;
+  } else if (last === "bridge" && canBridge) {
+    kind = "bridge"; state = "La última vez"; title = "Puente USB";
+    text = "Se conecta solo a la placa cuando está cerca."; action = goBridge;
+  } else {
+    kind = "none"; ok = false;
+    state = scanned ? "Nada detectado" : "Buscando…";
+    title = scanned ? "¿A qué lo conectas?" : "Buscando tu equipo…";
+    text = scanned
+      ? "Enchufa la tablet a tu PC con Pulsa, o elige abajo: con Bluetooth no hace falta instalar nada en el otro equipo."
+      : "Un momento: miro si la tablet está enchufada a un PC con Pulsa o si hay uno en tu WiFi.";
+  }
+  $("hero-pill").className = ok ? "pill" : "pill wait";
+  $("hero-state").textContent = state;
+  $("hero-title").textContent = title;
+  $("hero-text").textContent = text;
+  $("hero-link").setAttribute("href", LINKS[kind]);
+  $("hero-link").setAttribute("x", kind === "wifi" ? 62 : kind === "bridge" ? 78 : 58);
+  $("hero-link").setAttribute("y", kind === "wifi" ? 10 : 18);
+  $("hero-go").hidden = !action;
+  $("hero-go").onclick = action || null;
+  // El camino que ya está arriba no se repite abajo.
+  $("alt-usb").hidden = !canUsb || kind === "usb";
+  $("alt-wifi").hidden = kind === "wifi";
+  $("alt-bt").hidden = !canBt || kind === "bt";
+  $("alt-bridge").hidden = !canBridge || kind === "bridge";
+}
+
+// ── Detección ─────────────────────────────────────────────────────────
 function probe(host, port, done) {
   var x = new XMLHttpRequest(), ended = false;
   function end(info) { if (!ended) { ended = true; done(info); } }
@@ -89,10 +214,13 @@ function probe(host, port, done) {
   x.onerror = x.ontimeout = function () { end(null); };
   x.send();
 }
-function go(host, port) { connecting = true; location.href = "http://" + host + ":" + port + "/"; }
 function parseAddress(text) {
   var m = /^(?:https?:\/\/)?([^\/:\s]+)(?::(\d+))?\/?$/i.exec(text.replace(/^\s+|\s+$/g, ""));
   return m ? { host: m[1], port: parseInt(m[2], 10) || PORT } : null;
+}
+function uniquePcs(pcs) {
+  var seen = {};
+  return pcs.filter(function (pc) { var n = !(pc.id in seen); seen[pc.id] = true; return n; });
 }
 function showPcs(pcs) {
   var box = $("pcs");
@@ -103,47 +231,56 @@ function showPcs(pcs) {
     b.textContent = pc.name;
     small.textContent = pc.host;
     b.appendChild(small);
-    b.onclick = function () { bridge.rememberPc(pc.id); go(pc.host, pc.port); };
+    b.onclick = function () { bridge.rememberPc(pc.id); goPc(pc.host, pc.port); };
     box.appendChild(b);
   });
 }
-function uniquePcs(pcs) {
-  var seen = {};
-  return pcs.filter(function (pc) { var n = !(pc.id in seen); seen[pc.id] = true; return n; });
-}
 
-// Si hay cable manda el cable: la WiFi sólo entra sola cuando por USB no hay nada.
-var nextScan = 0, usbMissing = !bridge.usbWorks();
+var nextScan = 0, usbChecked = !canUsb;
 function pollScan() {
   if (connecting) return;
   var s = JSON.parse(bridge.scanState()), last = bridge.lastPc();
   s.pcs = uniquePcs(s.pcs);
   showPcs(s.pcs);
-  for (var i = 0; auto && usbMissing && last && i < s.pcs.length; i++) {
-    if (s.pcs[i].id === last) { go(s.pcs[i].host, s.pcs[i].port); return; }
-  }
-  $("scan-state").innerHTML = s.pcs.length
-    ? '<span class="dot ok"></span>Toca tu PC para conectar.'
-    : '<span class="dot"></span>Buscando tu PC…';
+  wifiPc = null;
+  for (var i = 0; last && i < s.pcs.length; i++) if (s.pcs[i].id === last) wifiPc = s.pcs[i];
+  // El PC de siempre entra solo por WiFi, pero sólo si por cable no hay nada.
+  if (wifiPc && auto && usbChecked && !usbInfo) { goPc(wifiPc.host, wifiPc.port); return; }
+  if (!s.scanning && nextScan) scanned = true;
+  $("wifi-state").textContent = s.pcs.length ? "Tu PC con Pulsa · " + s.pcs.length + " encontrado" + (s.pcs.length > 1 ? "s" : "") : "Tu PC con Pulsa · " + (s.scanning ? "buscando…" : "ninguno");
+  $("scan-state").textContent = s.pcs.length ? "Toca tu PC para conectar." : (s.scanning ? "Buscando PCs con Pulsa en tu WiFi…" : "No hay ninguno. ¿Está Pulsa abierto en el PC?");
   if (!s.scanning && Date.now() >= nextScan) { nextScan = Date.now() + SCAN_PAUSE_MS; bridge.scan(PORT); }
+  hero();
   setTimeout(pollScan, 700);
 }
 function pollUsb() {
   if (connecting) return;
   probe("localhost", PORT, function (info) {
     if (connecting) return;
-    usbMissing = !info;
-    $("usb-state").innerHTML = info
-      ? '<span class="dot ok"></span>' + info.name + " por cable"
-      : '<span class="dot"></span>Buscando PC por USB…';
-    $("usb-btn").disabled = !info;
-    if (info && auto) { go("localhost", PORT); return; }
+    usbInfo = info;
+    usbChecked = true;
+    $("usb-state").textContent = info ? "Tu PC con Pulsa · " + info.name : "Tu PC con Pulsa · no detectado";
+    if (info && auto) { goPc("localhost", PORT); return; }
+    hero();
     setTimeout(pollUsb, 1500);
   });
 }
 
-$("more").onclick = function () { $("more").hidden = true; $("manual").hidden = false; $("host").focus(); };
-$("usb-btn").onclick = function () { bridge.rememberPc(""); go("localhost", PORT); };
+// ── Botones de abajo ──────────────────────────────────────────────────
+function toggle(alt, panel) {
+  ["wifi", "usb", "bridge"].forEach(function (k) {
+    var open = k === panel && $(k + "-panel").hidden;
+    $(k + "-panel").hidden = !open;
+    $("alt-" + k).className = open ? "alt open" : "alt";
+  });
+}
+$("alt-bt").onclick = goBt;
+$("alt-bridge").onclick = function () { toggle("alt-bridge", "bridge"); };
+$("bridge-btn").onclick = goBridge;
+$("alt-usb").onclick = function () {
+  if (usbInfo) { bridge.rememberPc(""); goPc("localhost", PORT); } else toggle("alt-usb", "usb");
+};
+$("alt-wifi").onclick = function () { toggle("alt-wifi", "wifi"); };
 $("host").value = get("host", "");
 $("wifi-btn").onclick = function () {
   var a = parseAddress($("host").value);
@@ -151,21 +288,15 @@ $("wifi-btn").onclick = function () {
   set("host", $("host").value);
   $("msg").textContent = "Conectando…";
   probe(a.host, a.port, function (info) {
-    if (info) { if (info.id) bridge.rememberPc(info.id); go(a.host, a.port); }
+    if (info) { if (info.id) bridge.rememberPc(info.id); goPc(a.host, a.port); }
     else $("msg").textContent = "No se pudo contactar con " + a.host + ":" + a.port + ". ¿Está Pulsa abierto en el PC y el cortafuegos deja pasar el puerto " + PORT + "?";
   });
 };
 
-if (bridge.bridgeWorks()) {
-  $("bridge").hidden = false;
-  $("bridge-btn").onclick = function () { connecting = true; bridge.openBridge(); };
-}
-if (bridge.btWorks()) {
-  $("bt").hidden = false;
-  $("bt-btn").onclick = function () { connecting = true; bridge.openBt(); };
-}
+hero();
 pollScan();
-if (bridge.usbWorks()) pollUsb(); else $("usb").hidden = true;
+if (canUsb) pollUsb();
+setTimeout(function () { scanned = true; hero(); }, 6000);
 </script>
 </body>
 </html>
