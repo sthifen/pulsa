@@ -25,6 +25,8 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.net.Uri;
+import android.window.OnBackInvokedDispatcher;
 
 /**
  * El teclado a pantalla completa. El teclado en sí (teclas, sonidos,
@@ -70,6 +72,20 @@ public class MainActivity extends Activity {
             web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
         }
         web.setWebViewClient(new WebViewClient() {
+            /** Los enlaces a la web (la guía de la placa…) se abren en el navegador. */
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
+                Uri u = req.getUrl();
+                if ("https".equals(u.getScheme())) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, u));
+                    } catch (android.content.ActivityNotFoundException ignored) {
+                    }
+                    return true;
+                }
+                return false;
+            }
+
             @Override
             public void onReceivedError(WebView view, WebResourceRequest req, WebResourceError err) {
                 // Si el PC no responde, volver al lanzador, que reintenta solo.
@@ -85,6 +101,11 @@ public class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new JsBridge(), "PulsaNative");
+        if (Build.VERSION.SDK_INT >= 33) {
+            // Android 13+ con target 36: «atrás» llega por aquí, no por onBackPressed.
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::goBack);
+        }
         setContentView(web);
 
         if (state != null) web.restoreState(state);
@@ -376,12 +397,18 @@ public class MainActivity extends Activity {
     @SuppressWarnings("deprecation")
     @Override
     public void onBackPressed() {
+        goBack();
+    }
+
+    /** Del teclado se vuelve al lanzador; del lanzador se sale. */
+    private void goBack() {
         String url = web.getUrl();
         if (url != null && !url.startsWith(LAUNCHER)) {
             stopBt();
             web.loadUrl(LAUNCHER + "#manual");
+        } else {
+            finish();
         }
-        else super.onBackPressed();
     }
 
     @Override

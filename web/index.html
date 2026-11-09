@@ -370,7 +370,9 @@ function btPoll() {
   const was = online;
   online = st.state === "connected";
   if (was && !online) releaseAll(false);
-  pcName = online ? (BRIDGE ? "Puente USB" : "Bluetooth · " + (st.device || "conectado")) : (st.state === "error" ? st.error : BT_TEXT[st.state] || "Bluetooth");
+  pcName = online ? (BRIDGE ? "Puente USB" : "Bluetooth · " + (st.device || "conectado"))
+    : (st.error ? st.error : BT_TEXT[st.state] || "Bluetooth");
+  if (st.error && st.error !== btInfo.error) toast(st.error);
   if (st.caps !== leds.caps || st.num !== leds.num) { leds.caps = !!st.caps; leds.num = !!st.num; showLeds(); }
   btInfo = st;
   setConn();
