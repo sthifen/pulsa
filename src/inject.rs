@@ -22,13 +22,13 @@ use tokio::sync::watch;
 
 // ── Códigos de linux/input-event-codes.h y linux/uinput.h ─────────────────
 
-const UI_DEV_CREATE: libc::c_ulong = 0x5501;
-const UI_DEV_DESTROY: libc::c_ulong = 0x5502;
-const UI_DEV_SETUP: libc::c_ulong = 0x405c5503;
-const UI_SET_EVBIT: libc::c_ulong = 0x40045564;
-const UI_SET_KEYBIT: libc::c_ulong = 0x40045565;
-const UI_SET_RELBIT: libc::c_ulong = 0x40045566;
-const UI_SET_LEDBIT: libc::c_ulong = 0x40045569;
+const UI_DEV_CREATE: libc::Ioctl = 0x5501 as libc::Ioctl;
+const UI_DEV_DESTROY: libc::Ioctl = 0x5502 as libc::Ioctl;
+const UI_DEV_SETUP: libc::Ioctl = 0x405c5503 as libc::Ioctl;
+const UI_SET_EVBIT: libc::Ioctl = 0x40045564 as libc::Ioctl;
+const UI_SET_KEYBIT: libc::Ioctl = 0x40045565 as libc::Ioctl;
+const UI_SET_RELBIT: libc::Ioctl = 0x40045566 as libc::Ioctl;
+const UI_SET_LEDBIT: libc::Ioctl = 0x40045569 as libc::Ioctl;
 
 const EV_SYN: u16 = 0x00;
 const EV_KEY: u16 = 0x01;
@@ -88,6 +88,8 @@ struct UinputSetup {
     ff_effects_max: u32,
 }
 
+// time_t/suseconds_t: `long` del kernel, que es lo que pide input_event.
+#[allow(deprecated)]
 #[repr(C)]
 struct RawInputEvent {
     tv_sec: libc::time_t,
@@ -155,7 +157,7 @@ impl Drop for Uinput {
     }
 }
 
-fn ioctl_int(fd: i32, req: libc::c_ulong, value: u16) -> Result<()> {
+fn ioctl_int(fd: i32, req: libc::Ioctl, value: u16) -> Result<()> {
     // SAFETY: las peticiones UI_SET_* reciben un entero por valor.
     if unsafe { libc::ioctl(fd, req, value as libc::c_int) } < 0 {
         bail!("ioctl {req:#x} falló: {}", std::io::Error::last_os_error());

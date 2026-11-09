@@ -31,8 +31,13 @@
 </head>
 <body>
 <main>
-  <h1>Pulsa<small>Abre Pulsa en el PC y toca su nombre aquí.</small></h1>
+  <h1>Pulsa<small>Tu tablet como teclado. Elige con qué conectarla.</small></h1>
   <div id="msg"></div>
+  <section id="bt" hidden>
+    <h2>Por Bluetooth</h2>
+    <p>Como un teclado y ratón Bluetooth de verdad: sirve para una Raspberry, otro PC o un móvil, sin instalar nada en ellos.</p>
+    <button id="bt-btn">Usar como teclado Bluetooth</button>
+  </section>
   <section id="usb">
     <h2>Por cable USB</h2>
     <p id="usb-state"><span class="dot"></span>Buscando PC…</p>
@@ -58,7 +63,10 @@ function set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
 window.onhashchange = function () { location.reload(); };
 
 // Al volver con "atrás" o "Desconectar" no se reconecta solo; tras un error sí.
-var auto = location.hash !== "#manual";
+var auto = location.hash === "" || location.hash === "#error";
+var BT_MSG = { "#bt-denied": "Sin permiso de Bluetooth no puede hacer de teclado. Dáselo en Ajustes → Apps → Pulsa.",
+  "#bt-off": "Hace falta encender el Bluetooth.", "#bt-none": "Esta tablet no tiene Bluetooth." };
+if (BT_MSG[location.hash]) document.getElementById("msg").textContent = BT_MSG[location.hash];
 if (location.hash === "#error") $("msg").textContent = "Se perdió la conexión con el PC. Reintentando…";
 var bridge = window.PulsaNative, connecting = false;
 
@@ -142,6 +150,10 @@ $("wifi-btn").onclick = function () {
   });
 };
 
+if (bridge.btWorks()) {
+  $("bt").hidden = false;
+  $("bt-btn").onclick = function () { connecting = true; bridge.openBt(); };
+}
 pollScan();
 if (bridge.usbWorks()) pollUsb(); else $("usb").hidden = true;
 </script>

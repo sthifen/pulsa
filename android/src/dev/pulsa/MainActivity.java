@@ -2,7 +2,11 @@ package dev.pulsa;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.Manifest;
+import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
@@ -30,6 +34,10 @@ import android.webkit.WebViewClient;
  */
 public class MainActivity extends Activity {
     private static final String LAUNCHER = "file:///android_asset/launcher.html";
+    /** El teclado dentro de la app, para el modo Bluetooth (sin PC). */
+    private static final String BT_KEYBOARD = "file:///android_asset/keyboard.html";
+    private static final int REQ_BT_PERMS = 1, REQ_BT_ENABLE = 2, REQ_BT_VISIBLE = 3;
+    private BtHid bt;
     private final PcFinder finder = new PcFinder();
     private WebView web;
     private Vibrator vibrator;
@@ -138,7 +146,62 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void disconnect() {
             prefs().edit().remove("last_pc").apply();
-            runOnUiThread(() -> web.loadUrl(LAUNCHER + "#manual"));
+            runOnUiThread(() -> {
+                stopBt();
+                web.loadUrl(LAUNCHER + "#manual");
+            });
+        }
+
+        // ── Bluetooth: la tablet como teclado BT, sin PC ni nada instalado ──
+
+        /** El perfil de teclado Bluetooth existe desde Android 9. */
+        @JavascriptInterface
+        public boolean btWorks() {
+            return Build.VERSION.SDK_INT >= Build.VERSION_CODES.P;
+        }
+
+        @JavascriptInterface
+        public void openBt() {
+            runOnUiThread(MainActivity.this::startBt);
+        }
+
+        @JavascriptInterface
+        public void bt(String json) {
+            BtHid b = bt;
+            if (b != null) b.handle(json);
+        }
+
+        @JavascriptInterface
+        public void btRelease() {
+            BtHid b = bt;
+            if (b != null) b.releaseAll();
+        }
+
+        @JavascriptInterface
+        public String btState() {
+            BtHid b = bt;
+            return b != null ? b.state() : "{\"state\":\"starting\"}";
+        }
+
+        @JavascriptInterface
+        public String btDevices() {
+            BtHid b = bt;
+            return b != null ? b.devices() : "[]";
+        }
+
+        @JavascriptInterface
+        public void btConnect(String address) {
+            BtHid b = bt;
+            if (b != null) b.connect(address);
+        }
+
+        /** Dos minutos visible, para emparejarla desde el otro equipo. */
+        @JavascriptInterface
+        public void btVisible() {
+            runOnUiThread(() -> startActivityForResult(
+                    new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
+                            .putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 120),
+                    REQ_BT_VISIBLE));
         }
 
         /**
@@ -159,6 +222,60 @@ public class MainActivity extends Activity {
                         : HapticFeedbackConstants.KEYBOARD_TAP,
                         HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING));
             }
+        }
+    }
+
+    // ── Arranque del modo Bluetooth: permisos → Bluetooth encendido → teclado ──
+
+    private void startBt() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            String[] perms = {Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE};
+            for (String p : perms) {
+                if (checkSelfPermission(p) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(perms, REQ_BT_PERMS);
+                    return;
+                }
+            }
+        }
+        BluetoothAdapter a = BluetoothAdapter.getDefaultAdapter();
+        if (a == null) {
+            web.loadUrl(LAUNCHER + "#bt-none");
+            return;
+        }
+        if (!a.isEnabled()) {
+            startActivityForResult(new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQ_BT_ENABLE);
+            return;
+        }
+        if (bt == null) bt = new BtHid(this);
+        web.loadUrl(BT_KEYBOARD);
+    }
+
+    private void stopBt() {
+        if (bt != null) {
+            bt.close();
+            bt = null;
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int request, String[] perms, int[] results) {
+        if (request != REQ_BT_PERMS) return;
+        for (int r : results) {
+            if (r != PackageManager.PERMISSION_GRANTED) {
+                web.loadUrl(LAUNCHER + "#bt-denied");
+                return;
+            }
+        }
+        startBt();
+    }
+
+    @Override
+    protected void onActivityResult(int request, int result, Intent data) {
+        super.onActivityResult(request, result, data);
+        if (request == REQ_BT_ENABLE) {
+            if (result == RESULT_OK) startBt();
+            else web.loadUrl(LAUNCHER + "#bt-off");
         }
     }
 
@@ -198,7 +315,10 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         String url = web.getUrl();
-        if (url != null && !url.startsWith(LAUNCHER)) web.loadUrl(LAUNCHER + "#manual");
+        if (url != null && !url.startsWith(LAUNCHER)) {
+            stopBt();
+            web.loadUrl(LAUNCHER + "#manual");
+        }
         else super.onBackPressed();
     }
 
@@ -216,6 +336,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        stopBt();
         web.destroy();
         super.onDestroy();
     }

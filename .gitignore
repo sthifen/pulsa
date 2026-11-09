@@ -3,3 +3,5 @@ android/build/
 android/*.apk
 android/*.idsig
 android/debug.keystore
+android/assets/keyboard.html
+dist/

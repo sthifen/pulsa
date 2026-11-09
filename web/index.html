@@ -29,6 +29,7 @@
     --accent: #6ee7c5; --accent-top: #8ff0d4; --accent-ink: #0b2a23;
     --glow: 110, 231, 197;
     --pad: #152926; --pad-edge: #24443f;
+    --bar-ink: #dff3ec; --mod-ink: #dff3ec;
   }
   [data-theme="noche"] {
     --bg: #07070b; --bg2: #0e0e15; --plate: #101018;
@@ -50,7 +51,7 @@
   /* ── Barra de arriba ─────────────────────────────────────────── */
   #bar { position: fixed; top: 0; left: 0; right: 0; height: 34px; display: flex; align-items: center;
     gap: 14px; padding: 0 14px; font-size: 13px; color: var(--ink2); z-index: 5; }
-  #bar .brand { font-weight: 700; color: var(--ink); letter-spacing: .02em; }
+  #bar .brand { font-weight: 700; color: var(--bar-ink, var(--ink)); letter-spacing: .02em; }
   #conn { display: flex; align-items: center; gap: 7px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: #e5534b; transition: background .3s, box-shadow .3s; }
   .dot.ok { background: #3fb950; box-shadow: 0 0 8px #3fb95088; }
@@ -86,7 +87,7 @@
     line-height: 1.05; color: var(--ink); font-weight: 500; transition: transform 90ms cubic-bezier(.3,.7,.4,1); pointer-events: none; }
   .key.center .lbl { align-items: center; justify-content: center; padding: 0; }
   .key.small .lbl { font-size: calc(var(--fs, 15px) * .72); color: var(--ink2); }
-  .key.mod .lbl { font-size: calc(var(--fs, 15px) * .78); }
+  .key.mod .lbl { font-size: calc(var(--fs, 15px) * .78); color: var(--mod-ink, var(--ink)); }
   .key.accent .lbl { color: var(--accent-ink); }
   .key .lbl .sh { font-size: .78em; color: var(--ink2); margin-bottom: 3px; }
   .key .lbl .alt { position: absolute; right: 8px; bottom: 7px; font-size: .7em; color: var(--ink2); }
@@ -184,6 +185,13 @@
       <button data-v="full">Completo<small>100 %</small></button>
       <button data-v="sixty">Compacto<small>60 % + trackpad</small></button>
     </div>
+    <div id="bt-opts" hidden>
+      <h3>Bluetooth</h3>
+      <p>La tablet es un teclado y ratón Bluetooth: el otro equipo no necesita nada instalado. La primera vez, hazla visible y emparéjala desde el otro equipo como cualquier teclado.</p>
+      <div class="seg"><button id="bt-visible">Hacer visible<small>2 minutos</small></button></div>
+      <h3>Equipos emparejados</h3>
+      <div class="seg" id="bt-devs"></div>
+    </div>
     <h3>Posición</h3>
     <div class="seg" id="opt-pos"></div>
     <div class="slider" style="margin-top:12px"><span>Alto de las teclas</span><input id="opt-tall" type="range" min="100" max="150"></div>
@@ -252,7 +260,11 @@ const native = window.PulsaNative || null;
 //  Conexión con el PC
 // ═══════════════════════════════════════════════════════════════════
 let ws = null, online = false, retry = 400;
+// Dentro de la app y sin PC: la tablet hace de teclado Bluetooth.
+const BT = location.protocol === "file:" && !!(native && native.bt);
+let btInfo = {};
 function connect() {
+  if (BT) { btPoll(); return; }
   const name = native && native.deviceName ? native.deviceName() : "tablet";
   ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws?name=" + encodeURIComponent(name));
   ws.onopen = () => { online = true; retry = 400; setConn(); };
@@ -270,10 +282,44 @@ function connect() {
 let pcName = "";
 function setConn() {
   document.getElementById("dot").classList.toggle("ok", online);
-  document.getElementById("pcname").textContent = online ? (pcName || "Conectado") : "Sin conexión · reintentando";
+  document.getElementById("pcname").textContent = BT ? pcName : online ? (pcName || "Conectado") : "Sin conexión · reintentando";
 }
-function send(o) { if (online) ws.send(JSON.stringify(o)); }
-setInterval(() => send({ t: "p" }), 1000);
+function send(o) {
+  if (BT) { if (online) native.bt(JSON.stringify(o)); return; }
+  if (online) ws.send(JSON.stringify(o));
+}
+setInterval(() => { if (!BT) send({ t: "p" }); }, 1000);
+
+const BT_TEXT = { starting: "Bluetooth: preparando…", ready: "Bluetooth: esperando a un equipo",
+  connecting: "Bluetooth: conectando…", connected: "", error: "" };
+function btPoll() {
+  let st = {};
+  try { st = JSON.parse(native.btState()); } catch (_) {}
+  const was = online;
+  online = st.state === "connected";
+  if (was && !online) releaseAll(false);
+  pcName = online ? "Bluetooth · " + (st.device || "conectado") : (st.state === "error" ? st.error : BT_TEXT[st.state] || "Bluetooth");
+  if (st.caps !== leds.caps || st.num !== leds.num) { leds.caps = !!st.caps; leds.num = !!st.num; showLeds(); }
+  btInfo = st;
+  setConn();
+  setTimeout(btPoll, 500);
+}
+function btDevices() {
+  const box = document.getElementById("bt-devs");
+  let list = [];
+  try { list = JSON.parse(native.btDevices()); } catch (_) {}
+  box.textContent = "";
+  if (!list.length) { box.innerHTML = "<p>Todavía no hay equipos emparejados.</p>"; return; }
+  for (const d of list) {
+    const b = document.createElement("button");
+    b.className = d.connected ? "on" : "";
+    b.textContent = d.name;
+    const sm = document.createElement("small"); sm.textContent = d.connected ? "conectado" : "tocar para conectar";
+    b.appendChild(sm);
+    b.onclick = () => { native.btConnect(d.address); toast("Conectando con " + d.name + "…"); setTimeout(btDevices, 1500); };
+    box.appendChild(b);
+  }
+}
 
 const leds = { caps: false, num: false };
 function showLeds() {
@@ -844,6 +890,7 @@ board.addEventListener("pointermove", (e) => {
 
 function releaseAll(sendUp = true) {
   if (sendUp) for (const c of sentDown.keys()) send({ t: "k", c, d: false });
+  if (BT && sendUp) native.btRelease();
   sentDown.clear();
   touches.clear();
   fnHeld = 0; setFn();
@@ -983,7 +1030,13 @@ for (const el of pad.querySelectorAll(".btns div")) {
 //  Ajustes
 // ═══════════════════════════════════════════════════════════════════
 const sheet = document.getElementById("sheet");
-document.getElementById("gear").onclick = () => { releaseAll(); sheet.classList.add("open"); };
+document.getElementById("gear").onclick = () => { releaseAll(); if (BT) btDevices(); sheet.classList.add("open"); };
+if (BT) {
+  document.getElementById("bt-opts").hidden = false;
+  document.getElementById("bt-visible").onclick = () => native.btVisible();
+  // Tocar el estado de la barra abre directamente la lista de equipos.
+  document.getElementById("conn").onclick = () => document.getElementById("gear").onclick();
+}
 sheet.querySelector(".shade").onclick = () => sheet.classList.remove("open");
 
 function seg(id, key, after) {

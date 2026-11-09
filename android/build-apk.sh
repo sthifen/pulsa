@@ -47,6 +47,9 @@ if command -v javac >/dev/null; then JAVAC=(javac); else JAVAC=(java -m jdk.comp
 
 rm -rf "$OUT" && mkdir -p "$OUT"/{gen,classes,dex}
 
+# El mismo teclado que sirve el PC, dentro de la app para el modo Bluetooth.
+cp "$HERE/../web/index.html" "$HERE/assets/keyboard.html"
+
 echo "→ recursos"
 "$BT/aapt2" compile --dir "$HERE/res" -o "$OUT/res.zip"
 "$BT/aapt2" link -o "$OUT/base.apk" -I "$ANDROID_JAR" \
