@@ -115,3 +115,9 @@ Tablet (teclado web) ──WebSocket──► pulsa (PC) ──► /dev/uinput: 
   HID de Bluetooth.
 
 Compilar todo: `packaging/build-dist.sh` (binarios estáticos x86_64 y ARM64 + APK en `dist/`).
+
+## Licencia
+
+[MIT](LICENSE): libre para usar, copiar, modificar y compartir. Pulsa nació para ayudar a quien se quedó sin
+teclado; si te sirve, compártelo. Ideas y arreglos son bienvenidos en
+[Issues](https://github.com/sthifen/pulsa/issues).

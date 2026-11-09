@@ -48,3 +48,7 @@ Or grab `pulsa-x86_64-linux` / `pulsa-aarch64-linux` from the [latest release](h
 or `cargo install --git https://github.com/sthifen/pulsa`.
 
 The UI is in Spanish for now.
+
+## License
+
+[MIT](LICENSE). Made to help anyone left without a keyboard: use it, fork it, share it. Issues and PRs welcome.
